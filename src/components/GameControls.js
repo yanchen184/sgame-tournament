@@ -10,12 +10,11 @@ const GameControls = ({
   onTakeRest, 
   onContinuePlay,
   onUndoAction,
+  onEndGame,
   onResetGame,
   onToggleHistory,
   showHistory 
 }) => {
-  const canUndo = lastAction && (Date.now() - lastAction.timestamp < 30000);
-
   return (
     <div className="controls">
       {!gameStarted && (
@@ -56,11 +55,11 @@ const GameControls = ({
         </>
       )}
       
-      {gameStarted && canUndo && (
+      {gameStarted && lastAction && (
         <button 
           className="btn undo-btn" 
           onClick={onUndoAction}
-          title="撤銷上一步操作 (30秒內有效)"
+          title="撤銷上一步操作 (無時間限制)"
         >
           ↶ 撤銷
         </button>
@@ -72,6 +71,12 @@ const GameControls = ({
       >
         📚 {showHistory ? '關閉歷史' : '查看歷史'}
       </button>
+      
+      {gameStarted && (
+        <button className="btn end-btn" onClick={onEndGame}>
+          🏁 結束比賽
+        </button>
+      )}
       
       <button className="btn danger-btn" onClick={onResetGame}>
         🔄 重置比賽
