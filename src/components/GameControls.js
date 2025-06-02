@@ -17,18 +17,13 @@ const GameControls = ({
 }) => {
   return (
     <div className="controls">
-      {!gameStarted && (
-        <button className="btn start-btn" onClick={onStartGame}>
-          🎮 開始比賽
-        </button>
-      )}
+      {/* Removed start game button as game auto-starts after setup */}
       
-      {gameStarted && (
+      {gameStarted && !showRestOption && (
         <>
           <button 
             className="btn success-btn" 
             onClick={() => onDeclareWinner(1)}
-            disabled={showRestOption}
           >
             👈 左方勝利
           </button>
@@ -36,7 +31,6 @@ const GameControls = ({
           <button 
             className="btn success-btn" 
             onClick={() => onDeclareWinner(2)}
-            disabled={showRestOption}
           >
             右方勝利 👉
           </button>
