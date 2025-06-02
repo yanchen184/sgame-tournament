@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './PlayerSetup.css';
 
-const PlayerSetup = ({ onSetupPlayers }) => {
+const PlayerSetup = ({ onSetupPlayers, initialNames = ['bob', 'jimmy', 'white', 'dada'] }) => {
   const [playerNames, setPlayerNames] = useState(['', '', '', '']);
   const [currentStep, setCurrentStep] = useState(0);
+
+  // Initialize with provided names when component mounts
+  useEffect(() => {
+    setPlayerNames([...initialNames]);
+  }, [initialNames]);
 
   const handleNameChange = (index, value) => {
     const newNames = [...playerNames];
@@ -25,7 +30,7 @@ const PlayerSetup = ({ onSetupPlayers }) => {
 
   const handleSubmit = () => {
     const finalNames = playerNames.map((name, index) => 
-      name.trim() || `選手 ${String.fromCharCode(65 + index)}`
+      name.trim() || initialNames[index] || `選手 ${String.fromCharCode(65 + index)}`
     );
     onSetupPlayers(finalNames);
   };
@@ -63,7 +68,7 @@ const PlayerSetup = ({ onSetupPlayers }) => {
               type="text"
               value={playerNames[currentStep]}
               onChange={(e) => handleNameChange(currentStep, e.target.value)}
-              placeholder={`輸入第 ${currentStep + 1} 位選手名字...`}
+              placeholder={`輸入第 ${currentStep + 1} 位選手名字... (預設: ${initialNames[currentStep]})`}
               className="player-name-input"
               maxLength={12}
               autoFocus
@@ -92,7 +97,7 @@ const PlayerSetup = ({ onSetupPlayers }) => {
                 >
                   <span className="preview-number">{index + 1}</span>
                   <span className="preview-name">
-                    {name.trim() || `選手 ${String.fromCharCode(65 + index)}`}
+                    {name.trim() || initialNames[index] || `選手 ${String.fromCharCode(65 + index)}`}
                   </span>
                   {index <= currentStep && name.trim() && (
                     <span className="preview-check">✓</span>
@@ -134,9 +139,9 @@ const PlayerSetup = ({ onSetupPlayers }) => {
           <div className="quick-setup">
             <button 
               className="btn outline" 
-              onClick={() => onSetupPlayers(['選手 A', '選手 B', '選手 C', '選手 D'])}
+              onClick={() => onSetupPlayers(initialNames)}
             >
-              ⚡ 使用預設名稱快速開始
+              ⚡ 使用預設名稱快速開始 ({initialNames.join(', ')})
             </button>
           </div>
           
