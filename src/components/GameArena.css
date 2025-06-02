@@ -1,0 +1,91 @@
+.arena-section {
+  background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+  border-radius: 15px;
+  padding: 20px;
+  color: white;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.arena-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(255, 255, 255, 0.1) 10px,
+    rgba(255, 255, 255, 0.1) 20px
+  );
+  animation: movePattern 20s linear infinite;
+}
+
+@keyframes movePattern {
+  0% { transform: translateX(-50px) translateY(-50px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+
+.section-title {
+  font-size: 1.3em;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: white;
+  position: relative;
+  z-index: 1;
+}
+
+.battle-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  margin: 20px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.fighter {
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  padding: 20px;
+  border-radius: 15px;
+  font-weight: bold;
+  font-size: 1.2em;
+  min-width: 120px;
+  text-align: center;
+  transition: all 0.3s ease;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.vs-indicator {
+  font-size: 3em;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.rest-option {
+  background: #9b59b6;
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  margin: 15px 0;
+  text-align: center;
+  animation: glow 2s infinite alternate;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 10px rgba(155, 89, 182, 0.5); }
+  to { box-shadow: 0 0 20px rgba(155, 89, 182, 0.8); }
+}
