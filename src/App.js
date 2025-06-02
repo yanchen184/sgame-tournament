@@ -30,7 +30,7 @@ function App() {
   const [streakWinner, setStreakWinner] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [gameHistory, setGameHistory] = useState([]);
-  const [lastAction, setLastAction] = useState(null); // For undo functionality (no time limit)
+  const [lastAction, setLastAction] = useState(null); // For unlimited undo functionality
 
   // Enable Firebase integration (set to false to use offline mode)
   const enableFirebase = false; // 設為 false 使用離線模式
@@ -146,7 +146,7 @@ function App() {
     }
   };
 
-  // Save last action for undo (no time limit)
+  // Save last action for unlimited undo functionality
   const saveLastAction = (action) => {
     setLastAction({
       ...action,
@@ -158,13 +158,14 @@ function App() {
     });
   };
 
-  // Undo last action (no time limit)
+  // Undo last action (no time restrictions)
   const undoLastAction = () => {
     if (!lastAction) {
       showStatus('❌ 沒有可撤銷的操作', 'error');
       return;
     }
 
+    // Restore previous state without any time constraints
     setPlayers(lastAction.players);
     setCurrentFighters(lastAction.currentFighters);
     setBattleCount(lastAction.battleCount);
@@ -209,7 +210,7 @@ function App() {
     const winner = currentFighters[winnerIndex - 1];
     const loser = currentFighters[winnerIndex === 1 ? 1 : 0];
 
-    // Save current state for undo
+    // Save current state for unlimited undo
     saveLastAction({
       type: 'match_result',
       winner: winner.name,
@@ -292,7 +293,7 @@ function App() {
       return;
     }
 
-    // Save current state for undo
+    // Save current state for unlimited undo
     saveLastAction({
       type: 'rest_decision',
       player: streakWinner.name
@@ -410,7 +411,7 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.0.4</div>
+        <div className="version">v1.0.5</div>
         <PlayerSetup onSetupPlayers={setupPlayers} />
       </div>
     );
@@ -419,7 +420,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.0.4
+        v1.0.5
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
