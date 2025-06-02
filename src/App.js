@@ -7,6 +7,8 @@ import GameControls from './components/GameControls';
 import GameTimer from './components/GameTimer';
 import StatusMessage from './components/StatusMessage';
 import GameRules from './components/GameRules';
+import GameHistory from './components/GameHistory';
+import { useFirebaseGame } from './hooks/useFirebaseGame';
 
 // Initial player data
 const initialPlayers = [
@@ -25,11 +27,61 @@ function App() {
   const [statusMessage, setStatusMessage] = useState(null);
   const [showRestOption, setShowRestOption] = useState(false);
   const [streakWinner, setStreakWinner] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [gameHistory, setGameHistory] = useState([]);
+
+  // Enable Firebase integration
+  const enableFirebase = true; // Set to true to enable Firebase features
+  
+  const {
+    gameId,
+    isConnected,
+    isSaving,
+    error: firebaseError,
+    initializeGame: initFirebaseGame,
+    saveGameState,
+    savePlayers: savePlayersToFirebase,
+    recordMatch,
+    endGame: endFirebaseGame,
+    clearError
+  } = useFirebaseGame(enableFirebase);
 
   // Initialize game on component mount
   useEffect(() => {
     initGame();
   }, []);
+
+  // Initialize Firebase game when component mounts
+  useEffect(() => {
+    if (enableFirebase && !gameId) {
+      initFirebaseGame({
+        gameName: '四人單挑循環賽',
+        players: initialPlayers,
+        gameType: 'tournament',
+        maxTime: 3600
+      });
+    }
+  }, [enableFirebase, gameId, initFirebaseGame]);
+
+  // Save players to Firebase when players state changes
+  useEffect(() => {
+    if (enableFirebase && gameId && gameStarted) {
+      savePlayersToFirebase(players);
+    }
+  }, [players, gameId, gameStarted, savePlayersToFirebase, enableFirebase]);
+
+  // Save game state to Firebase when game state changes
+  useEffect(() => {
+    if (enableFirebase && gameId && gameStarted) {
+      saveGameState({
+        players,
+        currentFighters,
+        gameTime,
+        battleCount,
+        gameStarted
+      });
+    }
+  }, [players, currentFighters, gameTime, battleCount, gameStarted, gameId, saveGameState, enableFirebase]);
 
   // Shuffle array utility function
   const shuffleArray = (array) => {
@@ -72,6 +124,29 @@ function App() {
     }
   };
 
+  // Record match to history
+  const addToHistory = (winner, loser, type = 'normal') => {
+    const matchRecord = {
+      id: Date.now(),
+      timestamp: new Date(),
+      winner: winner.name,
+      loser: loser.name,
+      winnerScore: winner.score,
+      winnerStreak: winner.winStreak,
+      type: type, // 'normal', 'rest', 'final'
+      battleNumber: battleCount + 1
+    };
+
+    setGameHistory(prev => [matchRecord, ...prev]);
+
+    // Record to Firebase if enabled
+    if (enableFirebase && gameId) {
+      recordMatch(matchRecord);
+    }
+
+    return matchRecord;
+  };
+
   // Declare winner
   const declareWinner = (winnerIndex) => {
     if (!gameStarted || !currentFighters[0] || !currentFighters[1]) {
@@ -96,8 +171,11 @@ function App() {
     setPlayers(updatedPlayers);
     setBattleCount(prev => prev + 1);
 
-    // Check for 4-win streak
+    // Add to match history
     const updatedWinner = updatedPlayers.find(p => p.id === winner.id);
+    addToHistory(updatedWinner, loser, 'normal');
+
+    // Check for 4-win streak
     if (updatedWinner.winStreak === 4) {
       setShowRestOption(true);
       setStreakWinner(updatedWinner);
@@ -164,6 +242,22 @@ function App() {
     setPlayers(updatedPlayers);
     setCurrentFighters([null, null]);
     setShowRestOption(false);
+
+    // Add rest record to history
+    const restRecord = {
+      id: Date.now(),
+      timestamp: new Date(),
+      type: 'rest',
+      player: streakWinner.name,
+      action: '選擇休息並獲得額外 1 分',
+      battleNumber: battleCount + 1
+    };
+    setGameHistory(prev => [restRecord, ...prev]);
+
+    if (enableFirebase && gameId) {
+      recordMatch(restRecord);
+    }
+
     setStreakWinner(null);
     
     setTimeout(() => {
@@ -202,9 +296,20 @@ function App() {
     setShowRestOption(false);
     setStreakWinner(null);
     setStatusMessage(null);
+    setGameHistory([]);
     
     initGame();
     showStatus('🔄 比賽已重置！', 'info');
+
+    // Reset Firebase game
+    if (enableFirebase && gameId) {
+      initFirebaseGame({
+        gameName: '四人單挑循環賽',
+        players: initialPlayers,
+        gameType: 'tournament',
+        maxTime: 3600
+      });
+    }
   };
 
   // Show status message
@@ -243,15 +348,50 @@ function App() {
     });
     
     showStatus(message, 'info');
+
+    // End Firebase game
+    if (enableFirebase && gameId) {
+      endFirebaseGame({
+        finalRanking: sortedPlayers,
+        totalMatches: battleCount,
+        gameDuration: 3600 - gameTime
+      });
+    }
   };
+
+  // Clear Firebase error
+  useEffect(() => {
+    if (firebaseError) {
+      showStatus(`🔥 Firebase: ${firebaseError}`, 'warning');
+      setTimeout(() => {
+        clearError();
+      }, 3000);
+    }
+  }, [firebaseError, clearError]);
 
   return (
     <div className="App">
-      <div className="version">v1.0.1</div>
+      <div className="version">
+        v1.0.2
+        {enableFirebase && (
+          <span className="firebase-status">
+            {isConnected ? '🔥' : '📡'} 
+            {isSaving ? '💾' : ''}
+          </span>
+        )}
+      </div>
       
       <div className="container">
         <div className="header">
           <h1 className="title">🥊 四人單挑循環賽系統</h1>
+          {enableFirebase && (
+            <div className="firebase-info">
+              <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
+                {isConnected ? '🔥 Firebase 已連接' : '📡 離線模式'}
+              </span>
+              {gameId && <span className="game-id">遊戲ID: {gameId.substring(0, 8)}</span>}
+            </div>
+          )}
         </div>
 
         <GameTimer gameTime={gameTime} />
@@ -282,12 +422,21 @@ function App() {
           onTakeRest={takeRest}
           onContinuePlay={continuePlay}
           onResetGame={resetGame}
+          onToggleHistory={() => setShowHistory(!showHistory)}
+          showHistory={showHistory}
         />
 
         {statusMessage && (
           <StatusMessage 
             message={statusMessage.message}
             type={statusMessage.type}
+          />
+        )}
+
+        {showHistory && (
+          <GameHistory 
+            history={gameHistory}
+            onClose={() => setShowHistory(false)}
           />
         )}
 
