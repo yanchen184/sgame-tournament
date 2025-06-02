@@ -31,10 +31,10 @@ const GameRules = () => {
         </div>
         
         <div className="rule-item">
-          <div className="rule-icon">⏰</div>
+          <div className="rule-icon">↶</div>
           <div className="rule-content">
-            <h4>比賽時間</h4>
-            <p>比賽時間 60 分鐘，最終按總分排名</p>
+            <h4>撤銷功能</h4>
+            <p>隨時可以撤銷上一步操作，無時間限制</p>
           </div>
         </div>
         
@@ -42,15 +42,15 @@ const GameRules = () => {
           <div className="rule-icon">🎯</div>
           <div className="rule-content">
             <h4>公平原則</h4>
-            <p>最後一場必須包含原始順序第四位選手</p>
+            <p>所有選手都有平等的比賽機會</p>
           </div>
         </div>
         
         <div className="rule-item">
           <div className="rule-icon">🏆</div>
           <div className="rule-content">
-            <h4>勝利條件</h4>
-            <p>時間結束時積分最高者獲勝</p>
+            <h4>比賽結束</h4>
+            <p>手動結束比賽時按積分最高者獲勝</p>
           </div>
         </div>
       </div>
