@@ -63,6 +63,136 @@ npm start
 
 應用將在 `http://localhost:3000` 運行
 
+## 🔧 項目結構
+
+```
+src/
+├── components/          # React組件
+│   ├── GameArena.js    # 競技場組件
+│   ├── PlayerQueue.js  # 排隊組件
+│   ├── Scoreboard.js   # 積分榜組件
+│   ├── GameControls.js # 控制面板組件
+│   ├── GameTimer.js    # 計時器組件
+│   ├── StatusMessage.js # 狀態消息組件
+│   └── GameRules.js    # 規則說明組件
+├── config/
+│   └── firebase.js     # Firebase配置
+├── services/
+│   └── gameService.js  # Firebase服務
+├── hooks/
+│   └── useFirebaseGame.js # Firebase Hook
+├── App.js              # 主應用組件
+└── index.js            # 應用入口
+```
+
+## 🔥 Firebase 設置
+
+1. 在 [Firebase Console](https://console.firebase.google.com/) 創建新項目
+2. 啟用 Firestore Database
+3. 設置安全規則允許讀寫操作
+4. 複製項目配置到環境變量
+
+### Firestore 安全規則範例:
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+```
+
+## 🚀 部署
+
+### 自動部署 (GitHub Actions)
+項目配置了自動化部署流程，推送到main分支時自動部署到GitHub Pages。
+
+需要設置以下GitHub Secrets:
+- `REACT_APP_FIREBASE_API_KEY`
+- `REACT_APP_FIREBASE_AUTH_DOMAIN`
+- `REACT_APP_FIREBASE_PROJECT_ID`
+- `REACT_APP_FIREBASE_STORAGE_BUCKET`
+- `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
+- `REACT_APP_FIREBASE_APP_ID`
+- `REACT_APP_FIREBASE_MEASUREMENT_ID`
+
+### 手動部署
+```bash
+npm run build
+npm install -g serve
+serve -s build
+```
+
+## 🎮 使用說明
+
+1. **開始比賽**: 點擊"開始比賽"按鈕啟動遊戲
+2. **記錄結果**: 使用"左方勝利"或"右方勝利"按鈕記錄比賽結果
+3. **休息選擇**: 當選手連勝4場時，可選擇休息獲得額外積分
+4. **查看排名**: 積分榜會即時更新顯示當前排名
+5. **重置比賽**: 隨時可以重置比賽重新開始
+
+## 🛠️ 開發指南
+
+### 添加新功能
+1. 在 `src/components/` 創建新組件
+2. 在主應用中引入並使用
+3. 添加相應的CSS樣式
+4. 更新測試文件
+
+### 自定義樣式
+- 修改各組件的CSS文件
+- 調整 `src/index.css` 中的全局樣式
+- 使用CSS變量保持設計一致性
+
+## 📱 移動端優化
+
+- 響應式網格布局
+- 觸摸友好的按鈕設計
+- 優化的字體大小和間距
+- 流暢的動畫效果
+
+## 🔄 版本更新
+
+### v1.0.0 (當前版本)
+- ✅ 基礎比賽系統
+- ✅ 積分統計功能  
+- ✅ 連勝機制
+- ✅ 響應式設計
+- ✅ Firebase整合
+- ✅ 即時數據同步
+- ✅ GitHub Actions自動部署
+
+### 未來規劃
+- 🔜 多房間支持
+- 🔜 歷史記錄查詢
+- 🔜 選手統計分析
+- 🔜 自定義比賽規則
+- 🔜 語音提醒功能
+
+## 🤝 貢獻指南
+
+1. Fork 此倉庫
+2. 創建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 開啟 Pull Request
+
+## 📄 許可證
+
+此項目使用 MIT 許可證 - 查看 [LICENSE](LICENSE) 文件了解詳情
+
+## 📞 支持與反饋
+
+- 🐛 **問題報告**: [GitHub Issues](https://github.com/yanchen184/sgame-tournament/issues)
+- 💡 **功能建議**: [GitHub Discussions](https://github.com/yanchen184/sgame-tournament/discussions)
+- 📧 **聯繫開發者**: yanchen184@example.com
+
+## 🙏 致謝
+
+感謝所有為此項目做出貢獻的開發者和測試者！
+
 ---
 
 **享受比賽的樂趣！** 🥊🏆
