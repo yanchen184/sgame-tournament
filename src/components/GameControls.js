@@ -4,14 +4,18 @@ import './GameControls.css';
 const GameControls = ({ 
   gameStarted, 
   showRestOption,
+  lastAction,
   onStartGame, 
   onDeclareWinner, 
   onTakeRest, 
   onContinuePlay,
+  onUndoAction,
   onResetGame,
   onToggleHistory,
   showHistory 
 }) => {
+  const canUndo = lastAction && (Date.now() - lastAction.timestamp < 30000);
+
   return (
     <div className="controls">
       {!gameStarted && (
@@ -50,6 +54,16 @@ const GameControls = ({
             💪 繼續比賽
           </button>
         </>
+      )}
+      
+      {gameStarted && canUndo && (
+        <button 
+          className="btn undo-btn" 
+          onClick={onUndoAction}
+          title="撤銷上一步操作 (30秒內有效)"
+        >
+          ↶ 撤銷
+        </button>
       )}
       
       <button 
