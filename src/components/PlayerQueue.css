@@ -1,0 +1,75 @@
+.queue-section {
+  background: #f8f9fa;
+  border-radius: 15px;
+  padding: 20px;
+  border: 2px solid #e9ecef;
+}
+
+.section-title {
+  font-size: 1.3em;
+  font-weight: bold;
+  margin-bottom: 15px;
+  text-align: center;
+  color: #333;
+}
+
+.queue-container {
+  min-height: 200px;
+}
+
+.player {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.player:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.player-name {
+  font-weight: bold;
+  font-size: 1.1em;
+  color: #333;
+}
+
+.win-streak {
+  background: #f39c12;
+  color: white;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  align-self: flex-start;
+}
+
+.player-score {
+  background: #333;
+  color: white;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 1em;
+}
+
+.empty-queue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 150px;
+  color: #666;
+  font-style: italic;
+}
