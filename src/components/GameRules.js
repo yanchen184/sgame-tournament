@@ -26,7 +26,7 @@ const GameRules = () => {
           <div className="rule-icon">🔥</div>
           <div className="rule-content">
             <h4>連勝獎勵</h4>
-            <p>連勝 4 場可選擇休息並額外得 1 分</p>
+            <p>連勝 3 場可選擇休息並額外得 1 分</p>
           </div>
         </div>
         
