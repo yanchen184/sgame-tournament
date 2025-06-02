@@ -1,0 +1,130 @@
+.scoreboard {
+  background: #2c3e50;
+  border-radius: 15px;
+  padding: 20px;
+  color: white;
+}
+
+.section-title {
+  font-size: 1.3em;
+  font-weight: bold;
+  margin-bottom: 15px;
+  text-align: center;
+  color: white;
+}
+
+.scoreboard-container {
+  min-height: 200px;
+}
+
+.player {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.player.in-arena {
+  background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+  animation: pulse 2s infinite;
+  border-color: #fff;
+}
+
+.player.resting {
+  background: linear-gradient(45deg, #4CAF50, #45a049);
+  animation: victory 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes victory {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.player-rank {
+  font-weight: bold;
+  color: #f39c12;
+  margin-right: 8px;
+}
+
+.player-name {
+  font-weight: bold;
+  font-size: 1.1em;
+  display: flex;
+  align-items: center;
+}
+
+.player-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.win-streak {
+  background: #f39c12;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7em;
+  font-weight: bold;
+}
+
+.resting-badge {
+  background: #27ae60;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7em;
+  font-weight: bold;
+}
+
+.fighting-badge {
+  background: #e74c3c;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7em;
+  font-weight: bold;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.5; }
+}
+
+.player-score {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 1.2em;
+  min-width: 50px;
+  text-align: center;
+}
+
+.player.in-arena .player-score {
+  background: rgba(255, 255, 255, 0.9);
+  color: #ff6b6b;
+}
+
+.player.resting .player-score {
+  background: rgba(255, 255, 255, 0.9);
+  color: #4CAF50;
+}
