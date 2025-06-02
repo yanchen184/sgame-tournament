@@ -8,18 +8,21 @@ import GameTimer from './components/GameTimer';
 import StatusMessage from './components/StatusMessage';
 import GameRules from './components/GameRules';
 import GameHistory from './components/GameHistory';
+import PlayerSetup from './components/PlayerSetup';
 import { useFirebaseGame } from './hooks/useFirebaseGame';
 
-// Initial player data
-const initialPlayers = [
-  { id: 1, name: '選手 A', score: 0, winStreak: 0, position: 0, resting: false },
-  { id: 2, name: '選手 B', score: 0, winStreak: 0, position: 1, resting: false },
-  { id: 3, name: '選手 C', score: 0, winStreak: 0, position: 2, resting: false },
-  { id: 4, name: '選手 D', score: 0, winStreak: 0, position: 3, resting: false }
+// Initial player data template
+const createInitialPlayers = (names = ['選手 A', '選手 B', '選手 C', '選手 D']) => [
+  { id: 1, name: names[0] || '選手 A', score: 0, winStreak: 0, position: 0, resting: false },
+  { id: 2, name: names[1] || '選手 B', score: 0, winStreak: 0, position: 1, resting: false },
+  { id: 3, name: names[2] || '選手 C', score: 0, winStreak: 0, position: 2, resting: false },
+  { id: 4, name: names[3] || '選手 D', score: 0, winStreak: 0, position: 3, resting: false }
 ];
 
 function App() {
-  const [players, setPlayers] = useState(initialPlayers);
+  const [gameSetup, setGameSetup] = useState(false);
+  const [playerNames, setPlayerNames] = useState(['', '', '', '']);
+  const [players, setPlayers] = useState([]);
   const [currentFighters, setCurrentFighters] = useState([null, null]);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameTime, setGameTime] = useState(3600); // 60 minutes
@@ -29,9 +32,10 @@ function App() {
   const [streakWinner, setStreakWinner] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [gameHistory, setGameHistory] = useState([]);
+  const [lastAction, setLastAction] = useState(null); // For undo functionality
 
-  // Enable Firebase integration
-  const enableFirebase = true; // Set to true to enable Firebase features
+  // Enable Firebase integration (set to false to use offline mode)
+  const enableFirebase = false; // 設為 false 使用離線模式
   
   const {
     gameId,
@@ -48,20 +52,23 @@ function App() {
 
   // Initialize game on component mount
   useEffect(() => {
-    initGame();
-  }, []);
+    if (gameSetup && playerNames.some(name => name.trim())) {
+      initGame();
+    }
+  }, [gameSetup, playerNames]);
 
-  // Initialize Firebase game when component mounts
+  // Initialize Firebase game when players are set
   useEffect(() => {
-    if (enableFirebase && !gameId) {
+    if (enableFirebase && !gameId && gameSetup && players.length > 0) {
       initFirebaseGame({
         gameName: '四人單挑循環賽',
-        players: initialPlayers,
+        players: players,
         gameType: 'tournament',
-        maxTime: 3600
+        maxTime: 3600,
+        playerNames: playerNames
       });
     }
-  }, [enableFirebase, gameId, initFirebaseGame]);
+  }, [enableFirebase, gameId, gameSetup, players, initFirebaseGame, playerNames]);
 
   // Save players to Firebase when players state changes
   useEffect(() => {
@@ -78,10 +85,11 @@ function App() {
         currentFighters,
         gameTime,
         battleCount,
-        gameStarted
+        gameStarted,
+        gameHistory
       });
     }
-  }, [players, currentFighters, gameTime, battleCount, gameStarted, gameId, saveGameState, enableFirebase]);
+  }, [players, currentFighters, gameTime, battleCount, gameStarted, gameHistory, gameId, saveGameState, enableFirebase]);
 
   // Shuffle array utility function
   const shuffleArray = (array) => {
@@ -93,8 +101,26 @@ function App() {
     return newArray;
   };
 
+  // Setup players with custom names
+  const setupPlayers = (names) => {
+    setPlayerNames(names);
+    const initialPlayers = createInitialPlayers(names);
+    const shuffledPlayers = shuffleArray(initialPlayers).map((player, index) => ({
+      ...player,
+      position: index
+    }));
+    
+    setPlayers(shuffledPlayers);
+    setGameSetup(true);
+    setupInitialMatch(shuffledPlayers);
+    showStatus('🎯 選手設置完成！準備開始比賽', 'success');
+  };
+
   // Initialize game
   const initGame = () => {
+    if (!gameSetup) return;
+    
+    const initialPlayers = createInitialPlayers(playerNames);
     const shuffledPlayers = shuffleArray(initialPlayers).map((player, index) => ({
       ...player,
       position: index,
@@ -117,11 +143,41 @@ function App() {
 
   // Start game
   const startGame = () => {
-    if (!gameStarted) {
+    if (!gameStarted && gameSetup) {
       setGameStarted(true);
       showStatus('🎮 比賽開始！', 'success');
       setupInitialMatch();
     }
+  };
+
+  // Save last action for undo
+  const saveLastAction = (action) => {
+    setLastAction({
+      ...action,
+      timestamp: Date.now(),
+      players: JSON.parse(JSON.stringify(players)),
+      currentFighters: [...currentFighters],
+      battleCount,
+      gameHistory: [...gameHistory]
+    });
+  };
+
+  // Undo last action
+  const undoLastAction = () => {
+    if (!lastAction || Date.now() - lastAction.timestamp > 30000) { // 30秒內可撤銷
+      showStatus('❌ 無法撤銷：超過時間限制或沒有可撤銷的操作', 'error');
+      return;
+    }
+
+    setPlayers(lastAction.players);
+    setCurrentFighters(lastAction.currentFighters);
+    setBattleCount(lastAction.battleCount);
+    setGameHistory(lastAction.gameHistory);
+    setShowRestOption(false);
+    setStreakWinner(null);
+    
+    showStatus('↶ 已撤銷上一步操作', 'info');
+    setLastAction(null);
   };
 
   // Record match to history
@@ -133,7 +189,7 @@ function App() {
       loser: loser.name,
       winnerScore: winner.score,
       winnerStreak: winner.winStreak,
-      type: type, // 'normal', 'rest', 'final'
+      type: type,
       battleNumber: battleCount + 1
     };
 
@@ -156,6 +212,13 @@ function App() {
 
     const winner = currentFighters[winnerIndex - 1];
     const loser = currentFighters[winnerIndex === 1 ? 1 : 0];
+
+    // Save current state for undo
+    saveLastAction({
+      type: 'match_result',
+      winner: winner.name,
+      loser: loser.name
+    });
 
     // Update winner stats
     const updatedPlayers = players.map(player => {
@@ -206,7 +269,7 @@ function App() {
       newFighters[winnerIndex === 0 ? 1 : 0] = nextOpponent;
       setCurrentFighters(newFighters);
       
-      showStatus(`🎉 ${winner.name} 獲勝！下一場對戰準備中...`, 'success');
+      showStatus(`🎉 ${winner.name} 獲勝！${nextOpponent.name} 上場迎戰`, 'success');
     } else {
       showStatus('⚠️ 沒有更多對手可以比賽！', 'warning');
     }
@@ -232,6 +295,12 @@ function App() {
       showStatus('❌ 目前沒有選手可以休息！', 'error');
       return;
     }
+
+    // Save current state for undo
+    saveLastAction({
+      type: 'rest_decision',
+      player: streakWinner.name
+    });
 
     const updatedPlayers = players.map(player => 
       player.id === streakWinner.id 
@@ -286,9 +355,11 @@ function App() {
     }
   };
 
-  // Reset game
+  // Reset game completely
   const resetGame = () => {
-    setPlayers(initialPlayers);
+    setGameSetup(false);
+    setPlayerNames(['', '', '', '']);
+    setPlayers([]);
     setCurrentFighters([null, null]);
     setGameStarted(false);
     setGameTime(3600);
@@ -297,19 +368,9 @@ function App() {
     setStreakWinner(null);
     setStatusMessage(null);
     setGameHistory([]);
+    setLastAction(null);
     
-    initGame();
-    showStatus('🔄 比賽已重置！', 'info');
-
-    // Reset Firebase game
-    if (enableFirebase && gameId) {
-      initFirebaseGame({
-        gameName: '四人單挑循環賽',
-        players: initialPlayers,
-        gameType: 'tournament',
-        maxTime: 3600
-      });
-    }
+    showStatus('🔄 遊戲已重置！請重新設定選手', 'info');
   };
 
   // Show status message
@@ -354,7 +415,8 @@ function App() {
       endFirebaseGame({
         finalRanking: sortedPlayers,
         totalMatches: battleCount,
-        gameDuration: 3600 - gameTime
+        gameDuration: 3600 - gameTime,
+        playerNames
       });
     }
   };
@@ -368,6 +430,16 @@ function App() {
       }, 3000);
     }
   }, [firebaseError, clearError]);
+
+  // Show player setup if not configured
+  if (!gameSetup) {
+    return (
+      <div className="App">
+        <div className="version">v1.0.2</div>
+        <PlayerSetup onSetupPlayers={setupPlayers} />
+      </div>
+    );
+  }
 
   return (
     <div className="App">
@@ -384,12 +456,16 @@ function App() {
       <div className="container">
         <div className="header">
           <h1 className="title">🥊 四人單挑循環賽系統</h1>
-          {enableFirebase && (
+          {enableFirebase ? (
             <div className="firebase-info">
               <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
                 {isConnected ? '🔥 Firebase 已連接' : '📡 離線模式'}
               </span>
               {gameId && <span className="game-id">遊戲ID: {gameId.substring(0, 8)}</span>}
+            </div>
+          ) : (
+            <div className="offline-info">
+              <span className="offline-status">📱 本地模式</span>
             </div>
           )}
         </div>
@@ -417,10 +493,12 @@ function App() {
         <GameControls
           gameStarted={gameStarted}
           showRestOption={showRestOption}
+          lastAction={lastAction}
           onStartGame={startGame}
           onDeclareWinner={declareWinner}
           onTakeRest={takeRest}
           onContinuePlay={continuePlay}
+          onUndoAction={undoLastAction}
           onResetGame={resetGame}
           onToggleHistory={() => setShowHistory(!showHistory)}
           showHistory={showHistory}
