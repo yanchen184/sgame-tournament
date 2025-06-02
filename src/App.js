@@ -420,7 +420,7 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.0.7</div>
+        <div className="version">v1.0.8</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -429,7 +429,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.0.7
+        v1.0.8
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
