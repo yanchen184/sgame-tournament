@@ -57,6 +57,43 @@
   color: white;
 }
 
+.undo-btn {
+  background: linear-gradient(45deg, #e67e22, #d35400);
+  color: white;
+  animation: pulse-undo 3s infinite;
+  position: relative;
+}
+
+.undo-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse-undo {
+  0%, 100% { 
+    box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(230, 126, 34, 0.8);
+  }
+}
+
 .history-btn {
   background: linear-gradient(45deg, #34495e, #2c3e50);
   color: white;
@@ -83,11 +120,9 @@
 
 @keyframes pulse-orange {
   0%, 100% { 
-    transform: scale(1);
     box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
   }
   50% { 
-    transform: scale(1.02);
     box-shadow: 0 0 20px rgba(230, 126, 34, 0.8);
   }
 }
@@ -104,6 +139,7 @@
   background: rgba(255, 255, 255, 0.3);
   transition: width 0.6s, height 0.6s, top 0.6s, left 0.6s;
   transform: translate(-50%, -50%);
+  z-index: 1;
 }
 
 .btn:active:not(:disabled)::before {
@@ -111,6 +147,10 @@
   height: 300px;
   top: 50%;
   left: 50%;
+}
+
+.undo-btn::before {
+  z-index: 2;
 }
 
 @media (max-width: 768px) {
