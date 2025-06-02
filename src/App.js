@@ -103,7 +103,7 @@ function App() {
     }
   }, [players, currentFighters, battleCount, gameStarted, gameHistory, gameId, saveGameState, enableFirebase]);
 
-  // Setup players with custom names
+  // Setup players with custom names and auto-start game
   const setupPlayers = (names) => {
     setPlayerNames(names);
     const initialPlayers = createInitialPlayers(names);
@@ -114,8 +114,9 @@ function App() {
     
     setPlayers(shuffledPlayers);
     setGameSetup(true);
+    setGameStarted(true); // Auto-start the game
     setupInitialMatch(shuffledPlayers);
-    showStatus('🎯 選手設置完成！準備開始比賽', 'success');
+    showStatus('🎮 比賽開始！準備迎戰', 'success');
   };
 
   // Initialize game
@@ -143,7 +144,7 @@ function App() {
     }
   };
 
-  // Start game
+  // Start game (keep for reset functionality)
   const startGame = () => {
     if (!gameStarted && gameSetup) {
       setGameStarted(true);
@@ -419,7 +420,7 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.0.6</div>
+        <div className="version">v1.0.7</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -428,7 +429,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.0.6
+        v1.0.7
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
