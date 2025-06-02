@@ -8,7 +8,9 @@ const GameControls = ({
   onDeclareWinner, 
   onTakeRest, 
   onContinuePlay,
-  onResetGame 
+  onResetGame,
+  onToggleHistory,
+  showHistory 
 }) => {
   return (
     <div className="controls">
@@ -49,6 +51,13 @@ const GameControls = ({
           </button>
         </>
       )}
+      
+      <button 
+        className={`btn history-btn ${showHistory ? 'active' : ''}`} 
+        onClick={onToggleHistory}
+      >
+        📚 {showHistory ? '關閉歷史' : '查看歷史'}
+      </button>
       
       <button className="btn danger-btn" onClick={onResetGame}>
         🔄 重置比賽
