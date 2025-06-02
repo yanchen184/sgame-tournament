@@ -10,17 +10,33 @@ import GameHistory from './components/GameHistory';
 import PlayerSetup from './components/PlayerSetup';
 import { useFirebaseGame } from './hooks/useFirebaseGame';
 
+// Shuffle array utility function (moved to top for use in initial players)
+const shuffleArray = (array) => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
+// Default player names (randomized each time)
+const getDefaultPlayerNames = () => {
+  const baseNames = ['bob', 'jimmy', 'white', 'dada'];
+  return shuffleArray(baseNames);
+};
+
 // Initial player data template
-const createInitialPlayers = (names = ['選手 A', '選手 B', '選手 C', '選手 D']) => [
-  { id: 1, name: names[0] || '選手 A', score: 0, winStreak: 0, position: 0, resting: false },
-  { id: 2, name: names[1] || '選手 B', score: 0, winStreak: 0, position: 1, resting: false },
-  { id: 3, name: names[2] || '選手 C', score: 0, winStreak: 0, position: 2, resting: false },
-  { id: 4, name: names[3] || '選手 D', score: 0, winStreak: 0, position: 3, resting: false }
+const createInitialPlayers = (names = getDefaultPlayerNames()) => [
+  { id: 1, name: names[0] || 'bob', score: 0, winStreak: 0, position: 0, resting: false },
+  { id: 2, name: names[1] || 'jimmy', score: 0, winStreak: 0, position: 1, resting: false },
+  { id: 3, name: names[2] || 'white', score: 0, winStreak: 0, position: 2, resting: false },
+  { id: 4, name: names[3] || 'dada', score: 0, winStreak: 0, position: 3, resting: false }
 ];
 
 function App() {
   const [gameSetup, setGameSetup] = useState(false);
-  const [playerNames, setPlayerNames] = useState(['', '', '', '']);
+  const [playerNames, setPlayerNames] = useState(getDefaultPlayerNames());
   const [players, setPlayers] = useState([]);
   const [currentFighters, setCurrentFighters] = useState([null, null]);
   const [gameStarted, setGameStarted] = useState(false);
@@ -86,16 +102,6 @@ function App() {
       });
     }
   }, [players, currentFighters, battleCount, gameStarted, gameHistory, gameId, saveGameState, enableFirebase]);
-
-  // Shuffle array utility function
-  const shuffleArray = (array) => {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-  };
 
   // Setup players with custom names
   const setupPlayers = (names) => {
@@ -235,11 +241,11 @@ function App() {
     const updatedWinner = updatedPlayers.find(p => p.id === winner.id);
     addToHistory(updatedWinner, loser, 'normal');
 
-    // Check for 4-win streak
-    if (updatedWinner.winStreak === 4) {
+    // Check for 3-win streak (changed from 4 to 3)
+    if (updatedWinner.winStreak === 3) {
       setShowRestOption(true);
       setStreakWinner(updatedWinner);
-      showStatus(`🔥 ${updatedWinner.name} 連勝 4 場！可選擇休息或繼續比賽`, 'special');
+      showStatus(`🔥 ${updatedWinner.name} 連勝 3 場！可選擇休息或繼續比賽`, 'special');
       return;
     }
 
@@ -375,7 +381,9 @@ function App() {
   // Reset game completely
   const resetGame = () => {
     setGameSetup(false);
-    setPlayerNames(['', '', '', '']);
+    // Generate new random player names each time
+    const newPlayerNames = getDefaultPlayerNames();
+    setPlayerNames(newPlayerNames);
     setPlayers([]);
     setCurrentFighters([null, null]);
     setGameStarted(false);
@@ -411,8 +419,8 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.0.5</div>
-        <PlayerSetup onSetupPlayers={setupPlayers} />
+        <div className="version">v1.0.6</div>
+        <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
   }
@@ -420,7 +428,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.0.5
+        v1.0.6
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
