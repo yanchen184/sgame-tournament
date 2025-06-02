@@ -247,7 +247,7 @@ function App() {
 
   return (
     <div className="App">
-      <div className="version">v1.0.0</div>
+      <div className="version">v1.0.1</div>
       
       <div className="container">
         <div className="header">
