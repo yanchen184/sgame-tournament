@@ -10,21 +10,41 @@ const PlayerQueue = ({ players, currentFighters }) => {
     )
     .sort((a, b) => a.position - b.position);
 
+  // Get next player (first in queue)
+  const nextPlayer = queuePlayers[0];
+
   return (
     <div className="queue-section">
       <h3 className="section-title">📋 等待隊伍</h3>
       <div className="queue-container">
-        {queuePlayers.map(player => (
-          <div key={player.id} className="player">
-            <div className="player-info">
-              <span className="player-name">{player.name}</span>
-              {player.winStreak > 0 && (
-                <span className="win-streak">{player.winStreak} 連勝</span>
+        {queuePlayers.map((player, index) => {
+          const isNext = index === 0 && queuePlayers.length > 0;
+          
+          return (
+            <div 
+              key={player.id} 
+              className={`player ${isNext ? 'next-player' : ''}`}
+            >
+              <div className="player-info">
+                <span className="player-name">
+                  {player.name}
+                  {isNext && (
+                    <span className="next-indicator">
+                      ⚡ 下一位上場
+                    </span>
+                  )}
+                </span>
+                {player.winStreak > 0 && (
+                  <span className="win-streak">{player.winStreak} 連勝</span>
+                )}
+              </div>
+              <span className="player-score">{player.score}</span>
+              {isNext && (
+                <div className="next-glow"></div>
               )}
             </div>
-            <span className="player-score">{player.score}</span>
-          </div>
-        ))}
+          );
+        })}
         
         {queuePlayers.length === 0 && (
           <div className="empty-queue">
@@ -32,6 +52,15 @@ const PlayerQueue = ({ players, currentFighters }) => {
           </div>
         )}
       </div>
+      
+      {nextPlayer && (
+        <div className="next-player-alert">
+          <div className="alert-icon">👀</div>
+          <div className="alert-text">
+            <strong>{nextPlayer.name}</strong> 準備上場！
+          </div>
+        </div>
+      )}
     </div>
   );
 };
