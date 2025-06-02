@@ -1,0 +1,109 @@
+.status-message {
+  padding: 15px 20px;
+  border-radius: 10px;
+  text-align: center;
+  margin-top: 20px;
+  animation: fadeInSlide 0.5s ease-in;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 500;
+  border: 2px solid transparent;
+}
+
+@keyframes fadeInSlide {
+  from { 
+    opacity: 0; 
+    transform: translateY(-20px) scale(0.95);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1);
+  }
+}
+
+.status-message.info {
+  background: linear-gradient(45deg, #3498db, #2980b9);
+  color: white;
+  border-color: #2980b9;
+}
+
+.status-message.success {
+  background: linear-gradient(45deg, #2ecc71, #27ae60);
+  color: white;
+  border-color: #27ae60;
+  animation: fadeInSlide 0.5s ease-in, celebrate 0.8s ease-in 0.3s;
+}
+
+.status-message.error {
+  background: linear-gradient(45deg, #e74c3c, #c0392b);
+  color: white;
+  border-color: #c0392b;
+  animation: fadeInSlide 0.5s ease-in, shake 0.5s ease-in 0.2s;
+}
+
+.status-message.warning {
+  background: linear-gradient(45deg, #f39c12, #e67e22);
+  color: white;
+  border-color: #e67e22;
+}
+
+.status-message.special {
+  background: linear-gradient(45deg, #9b59b6, #8e44ad);
+  color: white;
+  border-color: #8e44ad;
+  animation: fadeInSlide 0.5s ease-in, glow 2s infinite alternate 0.5s;
+}
+
+@keyframes celebrate {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.05) rotate(1deg); }
+  75% { transform: scale(1.05) rotate(-1deg); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes glow {
+  from { 
+    box-shadow: 0 0 10px rgba(155, 89, 182, 0.5);
+  }
+  to { 
+    box-shadow: 0 0 20px rgba(155, 89, 182, 0.8);
+  }
+}
+
+.status-icon {
+  font-size: 1.3em;
+  animation: bounce 1s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-3px); }
+  60% { transform: translateY(-1px); }
+}
+
+.status-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.status-text br {
+  margin: 5px 0;
+}
+
+@media (max-width: 768px) {
+  .status-message {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .status-icon {
+    margin-bottom: 5px;
+  }
+}
