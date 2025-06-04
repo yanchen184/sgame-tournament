@@ -523,7 +523,7 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.1.2</div>
+        <div className="version">v1.2.0</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -532,7 +532,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.1.2
+        v1.2.0
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
@@ -558,39 +558,55 @@ function App() {
           )}
         </div>
 
-        <div className="game-area">
-          <PlayerQueue 
-            players={players}
-            currentFighters={currentFighters}
-          />
+        {/* Mobile-optimized layout: vertical stack */}
+        <div className="mobile-game-layout">
+          {/* 1. Current fighters (main focus) */}
+          <div className="current-fight-section">
+            <GameArena 
+              currentFighters={currentFighters}
+              showRestOption={showRestOption}
+              streakWinner={streakWinner}
+            />
+          </div>
           
-          <GameArena 
-            currentFighters={currentFighters}
-            showRestOption={showRestOption}
-            streakWinner={streakWinner}
-          />
-          
-          <Scoreboard 
-            players={players}
-            currentFighters={currentFighters}
-          />
-        </div>
+          {/* 2. Victory buttons */}
+          <div className="victory-buttons-section">
+            <GameControls
+              gameStarted={gameStarted}
+              gameEnded={gameEnded}
+              showRestOption={showRestOption}
+              hasUndoActions={undoStack.length > 0}
+              onStartGame={startGame}
+              onDeclareWinner={declareWinner}
+              onTakeRest={takeRest}
+              onContinuePlay={continuePlay}
+              onUndoAction={undoLastAction}
+              onEndGame={endGame}
+              onResetGame={resetGame}
+              onToggleHistory={() => setShowHistory(!showHistory)}
+              showHistory={showHistory}
+              layout="mobile"
+            />
+          </div>
 
-        <GameControls
-          gameStarted={gameStarted}
-          gameEnded={gameEnded}
-          showRestOption={showRestOption}
-          hasUndoActions={undoStack.length > 0}
-          onStartGame={startGame}
-          onDeclareWinner={declareWinner}
-          onTakeRest={takeRest}
-          onContinuePlay={continuePlay}
-          onUndoAction={undoLastAction}
-          onEndGame={endGame}
-          onResetGame={resetGame}
-          onToggleHistory={() => setShowHistory(!showHistory)}
-          showHistory={showHistory}
-        />
+          {/* 3. Next player queue */}
+          <div className="next-player-section">
+            <PlayerQueue 
+              players={players}
+              currentFighters={currentFighters}
+              layout="mobile"
+            />
+          </div>
+          
+          {/* 4. Scoreboard */}
+          <div className="scoreboard-section">
+            <Scoreboard 
+              players={players}
+              currentFighters={currentFighters}
+              layout="mobile"
+            />
+          </div>
+        </div>
 
         {statusMessage && (
           <StatusMessage 
