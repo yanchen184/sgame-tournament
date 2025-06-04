@@ -138,16 +138,22 @@ function App() {
     setupInitialMatch(shuffledPlayers);
   };
 
-  // Setup initial match or next available match
+  // Setup initial match or next available match - FIXED VERSION
   const setupInitialMatch = (playerList = players) => {
+    console.log('Setting up match with players:', playerList); // Debug log
+    
     const availablePlayers = playerList.filter(p => !p.resting);
+    const restingPlayers = playerList.filter(p => p.resting);
+    
+    console.log('Available players:', availablePlayers.length, 'Resting players:', restingPlayers.length); // Debug log
+    
     if (availablePlayers.length >= 2) {
       // Sort by position to ensure proper queue order
       const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
       setCurrentFighters([sortedAvailable[0], sortedAvailable[1]]);
+      console.log('Set fighters:', sortedAvailable[0].name, 'vs', sortedAvailable[1].name); // Debug log
     } else if (availablePlayers.length === 1) {
       // Only one player available, find a resting player to bring back
-      const restingPlayers = playerList.filter(p => p.resting);
       if (restingPlayers.length > 0) {
         // Bring back the first resting player
         const playerToReturn = restingPlayers[0];
@@ -157,16 +163,24 @@ function App() {
         setPlayers(updatedPlayers);
         setCurrentFighters([availablePlayers[0], playerToReturn]);
         showStatus(`😊 ${playerToReturn.name} 休息結束，重新上場！`, 'info');
+        console.log('Brought back resting player:', playerToReturn.name); // Debug log
       } else {
         setCurrentFighters([availablePlayers[0], null]);
+        console.log('Only one available player, waiting for opponent'); // Debug log
       }
     } else {
       // No available players, bring all resting players back
-      const allPlayersReturned = playerList.map(p => ({ ...p, resting: false }));
-      setPlayers(allPlayersReturned);
-      const sortedPlayers = allPlayersReturned.sort((a, b) => a.position - b.position);
-      setCurrentFighters([sortedPlayers[0], sortedPlayers[1]]);
-      showStatus('🔄 所有選手重新上場！', 'info');
+      if (restingPlayers.length > 0) {
+        const allPlayersReturned = playerList.map(p => ({ ...p, resting: false }));
+        setPlayers(allPlayersReturned);
+        const sortedPlayers = allPlayersReturned.sort((a, b) => a.position - b.position);
+        setCurrentFighters([sortedPlayers[0], sortedPlayers[1]]);
+        showStatus('🔄 所有選手重新上場！', 'info');
+        console.log('All players returned from rest'); // Debug log
+      } else {
+        setCurrentFighters([null, null]);
+        console.log('No players available'); // Debug log
+      }
     }
   };
 
@@ -350,12 +364,14 @@ function App() {
     return availablePlayers[0];
   };
 
-  // Handle rest decision
+  // Handle rest decision - FIXED VERSION
   const takeRest = () => {
     if (!streakWinner) {
       showStatus('❌ 目前沒有選手可以休息！', 'error');
       return;
     }
+
+    console.log('Player taking rest:', streakWinner.name); // Debug log
 
     // Save current state for unlimited undo
     saveStateToUndoStack('rest_decision', {
@@ -363,11 +379,17 @@ function App() {
       player: streakWinner.name
     });
 
+    // Remove the resting player from current fighters and reset fighters
+    setCurrentFighters([null, null]);
+
+    // Update player stats: add score, set resting, reset win streak
     const updatedPlayers = players.map(player => 
       player.id === streakWinner.id 
         ? { ...player, score: player.score + 1, resting: true, winStreak: 0 }
         : player
     );
+
+    console.log('Updated players after rest:', updatedPlayers); // Debug log
 
     setPlayers(updatedPlayers);
     setShowRestOption(false);
@@ -387,14 +409,16 @@ function App() {
       recordMatch(restRecord);
     }
 
+    const restingPlayerName = streakWinner.name;
     setStreakWinner(null);
     
-    // Setup next match after a short delay
+    // Setup next match after updating players
     setTimeout(() => {
+      console.log('Setting up match after rest...'); // Debug log
       setupInitialMatch(updatedPlayers);
-    }, 100);
+    }, 200); // Slightly longer delay to ensure state updates
 
-    showStatus(`😴 ${streakWinner.name} 選擇休息，獲得額外 1 分！`, 'info');
+    showStatus(`😴 ${restingPlayerName} 選擇休息，獲得額外 1 分！`, 'info');
   };
 
   // Continue playing (reject rest)
@@ -502,7 +526,7 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.1.0</div>
+        <div className="version">v1.1.1</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -511,7 +535,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.1.0
+        v1.1.1
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
