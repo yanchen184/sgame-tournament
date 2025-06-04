@@ -49,8 +49,8 @@ function App() {
   const [gameEnded, setGameEnded] = useState(false); // Track if game has ended
   const [undoStack, setUndoStack] = useState([]); // Stack for unlimited undo functionality
 
-  // Enable Firebase integration (set to false to use offline mode)
-  const enableFirebase = false;
+  // Enable Firebase integration - NOW ENABLED!
+  const enableFirebase = true;
   
   const {
     gameId,
@@ -523,7 +523,7 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.2.0</div>
+        <div className="version">v1.2.1</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -532,7 +532,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.2.0
+        v1.2.1
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
@@ -547,7 +547,7 @@ function App() {
           {enableFirebase ? (
             <div className="firebase-info">
               <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-                {isConnected ? '🔥 Firebase 已連接' : '📡 離線模式'}
+                {isConnected ? '🔥 Firebase 已連接' : '📡 連接中...'}
               </span>
               {gameId && <span className="game-id">遊戲ID: {gameId.substring(0, 8)}</span>}
             </div>
