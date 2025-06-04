@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './RoomBrowser.css';
+import { useFirebaseRoom } from '../hooks/useFirebaseGame';
 
 const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
   const [activeRooms, setActiveRooms] = useState([]);
@@ -7,7 +8,9 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [mode, setMode] = useState('browse'); // 'browse' or 'join' or 'create'
 
-  // Load active rooms (mock for now, will be replaced with Firebase)
+  const { getActiveRooms } = useFirebaseRoom(true);
+
+  // Load active rooms
   useEffect(() => {
     loadActiveRooms();
   }, []);
@@ -15,14 +18,15 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
   const loadActiveRooms = async () => {
     setIsLoadingRooms(true);
     try {
-      // TODO: Replace with actual Firebase call
-      // const rooms = await gameService.getActiveRooms();
-      
-      // Mock data for demonstration
+      const rooms = await getActiveRooms();
+      setActiveRooms(rooms);
+    } catch (error) {
+      console.error('Failed to load active rooms:', error);
+      // Fallback to mock data if Firebase is not available
       const mockRooms = [
         {
-          id: 'GAME123',
-          displayName: 'GAME123',
+          id: 'DEMO01',
+          displayName: 'DEMO01',
           playerCount: 4,
           currentPlayers: ['Alice', 'Bob', 'Charlie', 'David'],
           status: 'playing',
@@ -30,8 +34,8 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
           lastActivity: new Date(Date.now() - 2 * 60 * 1000) // 2 minutes ago
         },
         {
-          id: 'ROOM456',
-          displayName: 'ROOM456',
+          id: 'DEMO02',
+          displayName: 'DEMO02',
           playerCount: 3,
           currentPlayers: ['Emma', 'Frank', 'Grace'],
           status: 'playing',
@@ -39,10 +43,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
           lastActivity: new Date(Date.now() - 5 * 60 * 1000) // 5 minutes ago
         }
       ];
-      
       setActiveRooms(mockRooms);
-    } catch (error) {
-      console.error('Failed to load active rooms:', error);
     } finally {
       setIsLoadingRooms(false);
     }
@@ -66,7 +67,10 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
     if (diffInMinutes < 60) return `${diffInMinutes}分鐘前`;
     
     const diffInHours = Math.floor(diffInMinutes / 60);
-    return `${diffInHours}小時前`;
+    if (diffInHours < 24) return `${diffInHours}小時前`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays}天前`;
   };
 
   if (mode === 'create') {
@@ -83,8 +87,31 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
         </div>
         
         <div className="create-room-section">
-          <p>作為房主，你將創建一個新的比賽房間。</p>
-          <p>其他人可以通過房間號加入觀看和參與比賽。</p>
+          <div className="create-room-info">
+            <h3>🏠 成為房主</h3>
+            <p>作為房主，你將創建一個新的比賽房間。</p>
+            <p>其他人可以通過房間號加入觀看和參與比賽。</p>
+            
+            <div className="host-benefits">
+              <h4>房主權限：</h4>
+              <ul>
+                <li>🎯 控制比賽進行（記錄勝負）</li>
+                <li>⚙️ 設定比賽規則和人數</li>
+                <li>🏁 決定比賽何時結束</li>
+                <li>🔄 管理撤銷操作</li>
+              </ul>
+            </div>
+            
+            <div className="guest-info">
+              <h4>觀戰者可以：</h4>
+              <ul>
+                <li>👀 即時觀看比賽進度</li>
+                <li>📊 查看積分榜和統計</li>
+                <li>📜 瀏覽比賽歷史</li>
+                <li>🔄 同步接收所有更新</li>
+              </ul>
+            </div>
+          </div>
           
           <button 
             className="create-room-btn"
@@ -112,23 +139,36 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
         </div>
         
         <div className="join-room-section">
-          <p>輸入房間號碼來加入正在進行的比賽：</p>
-          
-          <div className="room-code-input">
-            <input
-              type="text"
-              placeholder="輸入房間號碼 (例如: GAME123)"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-              onKeyPress={(e) => e.key === 'Enter' && handleJoinByCode()}
-              maxLength="10"
-            />
-            <button 
-              onClick={handleJoinByCode}
-              disabled={!roomCode.trim() || isLoading}
-            >
-              {isLoading ? '加入中...' : '加入房間'}
-            </button>
+          <div className="join-room-info">
+            <h3>📱 輸入房間號</h3>
+            <p>向房主索取6位數房間號碼，即可加入正在進行的比賽：</p>
+            
+            <div className="room-code-input">
+              <input
+                type="text"
+                placeholder="輸入房間號碼 (例如: ABC123)"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                onKeyPress={(e) => e.key === 'Enter' && handleJoinByCode()}
+                maxLength="6"
+              />
+              <button 
+                onClick={handleJoinByCode}
+                disabled={!roomCode.trim() || isLoading}
+              >
+                {isLoading ? '加入中...' : '加入房間'}
+              </button>
+            </div>
+            
+            <div className="join-tips">
+              <h4>💡 加入提示：</h4>
+              <ul>
+                <li>房間號不區分大小寫</li>
+                <li>加入後可即時觀看比賽</li>
+                <li>只有房主可以控制比賽</li>
+                <li>所有人都能看到即時更新</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -138,7 +178,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
   return (
     <div className="room-browser">
       <div className="room-browser-header">
-        <h2>🏠 房間選擇</h2>
+        <h2>🏠 多人房間</h2>
         <button 
           className="refresh-btn"
           onClick={loadActiveRooms}
@@ -165,7 +205,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
       </div>
 
       <div className="active-rooms-section">
-        <h3>🎯 進行中的房間</h3>
+        <h3>🎯 進行中的房間 ({activeRooms.length})</h3>
         
         {isLoadingRooms ? (
           <div className="loading-state">
@@ -174,35 +214,45 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
           </div>
         ) : activeRooms.length === 0 ? (
           <div className="empty-state">
-            <p>🤷‍♂️ 目前沒有進行中的房間</p>
+            <div className="empty-icon">🤷‍♂️</div>
+            <h4>目前沒有進行中的房間</h4>
             <p>成為第一個創建房間的人吧！</p>
+            <button 
+              className="empty-create-btn"
+              onClick={() => setMode('create')}
+            >
+              🎮 立即創建房間
+            </button>
           </div>
         ) : (
           <div className="rooms-grid">
             {activeRooms.map((room) => (
               <div key={room.id} className="room-card">
                 <div className="room-header">
-                  <h4 className="room-title">🏆 {room.displayName}</h4>
-                  <span className="room-status playing">比賽中</span>
+                  <h4 className="room-title">🏆 房間 {room.displayName}</h4>
+                  <div className="room-badges">
+                    <span className="room-status playing">比賽中</span>
+                    <span className="player-count">{room.playerCount}人</span>
+                  </div>
                 </div>
                 
                 <div className="room-info">
                   <div className="room-detail">
-                    <span className="label">👥 人數:</span>
-                    <span className="value">{room.playerCount}人</span>
-                  </div>
-                  
-                  <div className="room-detail">
                     <span className="label">👤 選手:</span>
                     <span className="value players-list">
-                      {room.currentPlayers.slice(0, 2).join(', ')}
-                      {room.currentPlayers.length > 2 && `...等${room.currentPlayers.length}人`}
+                      {room.currentPlayers.slice(0, 3).join(', ')}
+                      {room.currentPlayers.length > 3 && `...等${room.currentPlayers.length}人`}
                     </span>
                   </div>
                   
                   <div className="room-detail">
                     <span className="label">⏰ 最後活動:</span>
                     <span className="value">{formatTimeAgo(room.lastActivity)}</span>
+                  </div>
+                  
+                  <div className="room-detail">
+                    <span className="label">🕐 創建時間:</span>
+                    <span className="value">{formatTimeAgo(room.created)}</span>
                   </div>
                 </div>
                 
@@ -220,13 +270,37 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
       </div>
 
       <div className="room-tips">
-        <h4>💡 小貼士</h4>
-        <ul>
-          <li>所有人都可以在同一個房間觀看比賽進度</li>
-          <li>房主可以控制比賽進行，其他人可以觀看</li>
-          <li>房間會自動同步最新的比賽狀態</li>
-          <li>比賽結束後房間會保留一段時間供查看結果</li>
-        </ul>
+        <h4>💡 多人模式說明</h4>
+        <div className="tips-grid">
+          <div className="tip-item">
+            <span className="tip-icon">🎮</span>
+            <div>
+              <strong>房主模式</strong>
+              <p>創建房間後成為房主，擁有比賽控制權</p>
+            </div>
+          </div>
+          <div className="tip-item">
+            <span className="tip-icon">👀</span>
+            <div>
+              <strong>觀戰模式</strong>
+              <p>加入他人房間，即時觀看比賽進度</p>
+            </div>
+          </div>
+          <div className="tip-item">
+            <span className="tip-icon">🔄</span>
+            <div>
+              <strong>即時同步</strong>
+              <p>所有人都能看到最新的比賽狀態</p>
+            </div>
+          </div>
+          <div className="tip-item">
+            <span className="tip-icon">📱</span>
+            <div>
+              <strong>手機友好</strong>
+              <p>支援多設備同時觀看同一場比賽</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
