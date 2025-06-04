@@ -14,10 +14,11 @@ const GameControls = ({
   onEndGame,
   onResetGame,
   onToggleHistory,
-  showHistory 
+  showHistory,
+  layout = 'desktop' // new prop for layout mode
 }) => {
   return (
-    <div className="controls">
+    <div className={`controls ${layout === 'mobile' ? 'mobile-controls' : ''}`}>
       {/* Show start button only if game hasn't started yet */}
       {!gameStarted && (
         <button className="btn start-btn" onClick={onStartGame}>
@@ -25,28 +26,28 @@ const GameControls = ({
         </button>
       )}
       
-      {/* Game in progress controls */}
+      {/* Game in progress controls - prioritize victory buttons on mobile */}
       {gameStarted && !gameEnded && !showRestOption && (
-        <>
+        <div className="victory-buttons">
           <button 
-            className="btn success-btn" 
+            className="btn success-btn victory-left" 
             onClick={() => onDeclareWinner(1)}
           >
             👈 左方勝利
           </button>
           
           <button 
-            className="btn success-btn" 
+            className="btn success-btn victory-right" 
             onClick={() => onDeclareWinner(2)}
           >
             右方勝利 👉
           </button>
-        </>
+        </div>
       )}
       
       {/* Rest option controls */}
       {showRestOption && !gameEnded && (
-        <>
+        <div className="rest-options">
           <button className="btn rest-btn" onClick={onTakeRest}>
             😴 加1分下場
           </button>
@@ -54,39 +55,42 @@ const GameControls = ({
           <button className="btn continue-btn" onClick={onContinuePlay}>
             💪 繼續比賽
           </button>
-        </>
+        </div>
       )}
       
-      {/* Undo button - available whenever there are actions to undo */}
-      {hasUndoActions && (
+      {/* Secondary controls */}
+      <div className="secondary-controls">
+        {/* Undo button - available whenever there are actions to undo */}
+        {hasUndoActions && (
+          <button 
+            className="btn undo-btn" 
+            onClick={onUndoAction}
+            title="撤銷上一步操作 (無限制撤銷)"
+          >
+            ↶ 撤銷
+          </button>
+        )}
+        
+        {/* History toggle button */}
         <button 
-          className="btn undo-btn" 
-          onClick={onUndoAction}
-          title="撤銷上一步操作 (無限制撤銷)"
+          className={`btn history-btn ${showHistory ? 'active' : ''}`} 
+          onClick={onToggleHistory}
         >
-          ↶ 撤銷
+          📚 {showHistory ? '關閉歷史' : '查看歷史'}
         </button>
-      )}
-      
-      {/* History toggle button */}
-      <button 
-        className={`btn history-btn ${showHistory ? 'active' : ''}`} 
-        onClick={onToggleHistory}
-      >
-        📚 {showHistory ? '關閉歷史' : '查看歷史'}
-      </button>
-      
-      {/* End game button - only show during active game */}
-      {gameStarted && !gameEnded && (
-        <button className="btn end-btn" onClick={onEndGame}>
-          🏁 結束比賽
+        
+        {/* End game button - only show during active game */}
+        {gameStarted && !gameEnded && (
+          <button className="btn end-btn" onClick={onEndGame}>
+            🏁 結束比賽
+          </button>
+        )}
+        
+        {/* Reset button - always available */}
+        <button className="btn danger-btn" onClick={onResetGame}>
+          🔄 重置比賽
         </button>
-      )}
-      
-      {/* Reset button - always available */}
-      <button className="btn danger-btn" onClick={onResetGame}>
-        🔄 重置比賽
-      </button>
+      </div>
     </div>
   );
 };
