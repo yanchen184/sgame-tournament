@@ -1,12 +1,12 @@
 import React from 'react';
 import './Scoreboard.css';
 
-const Scoreboard = ({ players, currentFighters }) => {
+const Scoreboard = ({ players, currentFighters, layout = 'desktop' }) => {
   // Sort players by score (descending)
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
   return (
-    <div className="scoreboard">
+    <div className={`scoreboard ${layout === 'mobile' ? 'mobile-scoreboard' : ''}`}>
       <h3 className="section-title">🏆 積分榜</h3>
       <div className="scoreboard-container">
         {sortedPlayers.map((player, index) => {
@@ -15,10 +15,12 @@ const Scoreboard = ({ players, currentFighters }) => {
           return (
             <div 
               key={player.id} 
-              className={`player ${isInArena ? 'in-arena' : ''} ${player.resting ? 'resting' : ''}`}
+              className={`player ${isInArena ? 'in-arena' : ''} ${player.resting ? 'resting' : ''} ${index === 0 ? 'first-place' : ''}`}
             >
               <div className="player-info">
-                <span className="player-rank">{index + 1}.</span>
+                <span className={`player-rank ${index === 0 ? 'rank-first' : ''}`}>
+                  {index === 0 && layout === 'mobile' ? '👑' : `${index + 1}.`}
+                </span>
                 <span className="player-name">{player.name}</span>
                 <div className="player-badges">
                   {player.winStreak > 0 && (
@@ -32,7 +34,9 @@ const Scoreboard = ({ players, currentFighters }) => {
                   )}
                 </div>
               </div>
-              <span className="player-score">{player.score}</span>
+              <span className={`player-score ${index === 0 ? 'score-first' : ''}`}>
+                {player.score}
+              </span>
             </div>
           );
         })}
