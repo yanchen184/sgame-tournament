@@ -48,7 +48,7 @@ const GameControls = ({
       {showRestOption && !gameEnded && (
         <>
           <button className="btn rest-btn" onClick={onTakeRest}>
-            😴 選擇休息 (+1分)
+            😴 加1分下場
           </button>
           
           <button className="btn continue-btn" onClick={onContinuePlay}>
