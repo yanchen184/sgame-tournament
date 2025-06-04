@@ -1,7 +1,9 @@
 import React from 'react';
 import './GameRules.css';
 
-const GameRules = () => {
+const GameRules = ({ playerCount = 4 }) => {
+  const requiredWins = playerCount - 1; // Dynamic win requirement
+
   return (
     <div className="rules">
       <h3 className="rules-title">📋 比賽規則</h3>
@@ -10,7 +12,7 @@ const GameRules = () => {
           <div className="rule-icon">🥊</div>
           <div className="rule-content">
             <h4>比賽機制</h4>
-            <p>一對一單挑，勝者留場，輸者下場排隊</p>
+            <p>{playerCount}人循環一對一單挑，勝者留場，輸者下場排隊</p>
           </div>
         </div>
         
@@ -26,7 +28,7 @@ const GameRules = () => {
           <div className="rule-icon">🔥</div>
           <div className="rule-content">
             <h4>連勝獎勵</h4>
-            <p>連勝每 3 場（3、6、9...）可選擇加 1 分下場</p>
+            <p>連勝每 {requiredWins} 場（{requiredWins}、{requiredWins * 2}、{requiredWins * 3}...）可選擇加 1 分下場</p>
           </div>
         </div>
         
@@ -56,7 +58,7 @@ const GameRules = () => {
       </div>
       
       <div className="rules-footer">
-        <p>💡 提示：連勝 3 場表示已打贏所有對手一輪，可選擇加分下場！</p>
+        <p>💡 提示：連勝 {requiredWins} 場表示已打贏所有對手一輪，可選擇加分下場！</p>
         <p>🔄 選擇下場不會離開比賽，只是排到隊伍後面等候</p>
       </div>
     </div>
