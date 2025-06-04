@@ -27,11 +27,23 @@ const COLLECTIONS = {
 class GameService {
   
   /**
+   * Check if Firebase is available
+   */
+  isFirebaseAvailable() {
+    return db !== null && db !== undefined;
+  }
+
+  /**
    * Create a new game session
    * @param {Object} gameData - Initial game data
    * @returns {Promise<string>} - Game ID
    */
   async createGame(gameData) {
+    if (!this.isFirebaseAvailable()) {
+      console.warn('Firebase not available, skipping game creation');
+      return 'offline-' + Date.now();
+    }
+
     try {
       const gamesRef = collection(db, COLLECTIONS.GAMES);
       const gameDoc = await addDoc(gamesRef, {
@@ -45,7 +57,8 @@ class GameService {
       return gameDoc.id;
     } catch (error) {
       console.error('Error creating game:', error);
-      throw error;
+      // Return offline ID instead of throwing error
+      return 'offline-' + Date.now();
     }
   }
 
@@ -55,6 +68,11 @@ class GameService {
    * @param {Object} updateData - Data to update
    */
   async updateGame(gameId, updateData) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode, skipping game update');
+      return;
+    }
+
     try {
       const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
       await updateDoc(gameRef, {
@@ -65,7 +83,7 @@ class GameService {
       console.log('Game updated successfully');
     } catch (error) {
       console.error('Error updating game:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 
@@ -75,6 +93,11 @@ class GameService {
    * @returns {Promise<Object>} - Game data
    */
   async getGame(gameId) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode');
+      return { id: gameId, status: 'offline' };
+    }
+
     try {
       const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
       const gameSnap = await getDoc(gameRef);
@@ -86,7 +109,7 @@ class GameService {
       }
     } catch (error) {
       console.error('Error getting game:', error);
-      throw error;
+      return { id: gameId, status: 'error' };
     }
   }
 
@@ -96,6 +119,11 @@ class GameService {
    * @param {Array} players - Players array
    */
   async savePlayers(gameId, players) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode, skipping players save');
+      return;
+    }
+
     try {
       const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
       await updateDoc(gameRef, {
@@ -106,7 +134,7 @@ class GameService {
       console.log('Players saved successfully');
     } catch (error) {
       console.error('Error saving players:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 
@@ -116,6 +144,11 @@ class GameService {
    * @param {Object} matchData - Match data
    */
   async recordMatch(gameId, matchData) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode, skipping match record');
+      return;
+    }
+
     try {
       const matchesRef = collection(db, COLLECTIONS.MATCHES);
       await addDoc(matchesRef, {
@@ -127,7 +160,7 @@ class GameService {
       console.log('Match recorded successfully');
     } catch (error) {
       console.error('Error recording match:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 
@@ -138,6 +171,11 @@ class GameService {
    * @returns {Promise<Array>} - Array of matches
    */
   async getMatchHistory(gameId, limitCount = 50) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode');
+      return [];
+    }
+
     try {
       const matchesRef = collection(db, COLLECTIONS.MATCHES);
       const q = query(
@@ -155,14 +193,17 @@ class GameService {
             }
           });
           resolve(matches);
-        }, reject);
+        }, (error) => {
+          console.error('Error in match history snapshot:', error);
+          resolve([]); // Return empty array instead of rejecting
+        });
         
         // Return unsubscribe function for cleanup
         return unsubscribe;
       });
     } catch (error) {
       console.error('Error getting match history:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -173,6 +214,12 @@ class GameService {
    * @returns {Function} - Unsubscribe function
    */
   subscribeToGame(gameId, callback) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode');
+      // Return a no-op unsubscribe function
+      return () => {};
+    }
+
     try {
       const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
       return onSnapshot(gameRef, (doc) => {
@@ -181,10 +228,13 @@ class GameService {
         } else {
           callback(null);
         }
+      }, (error) => {
+        console.error('Error in game subscription:', error);
+        callback(null);
       });
     } catch (error) {
       console.error('Error subscribing to game:', error);
-      throw error;
+      return () => {};
     }
   }
 
@@ -194,6 +244,11 @@ class GameService {
    * @param {Object} finalResults - Final game results
    */
   async endGame(gameId, finalResults) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode, skipping game end');
+      return;
+    }
+
     try {
       const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
       await updateDoc(gameRef, {
@@ -206,7 +261,7 @@ class GameService {
       console.log('Game ended successfully');
     } catch (error) {
       console.error('Error ending game:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 
@@ -216,6 +271,17 @@ class GameService {
    * @returns {Promise<Object>} - Game statistics
    */
   async getGameStats(gameId) {
+    if (!this.isFirebaseAvailable() || gameId.startsWith('offline-')) {
+      console.warn('Firebase not available or offline mode');
+      return {
+        totalMatches: 0,
+        gameScore: [],
+        matchHistory: [],
+        gameStatus: 'offline',
+        gameDuration: 0
+      };
+    }
+
     try {
       const game = await this.getGame(gameId);
       const matches = await this.getMatchHistory(gameId);
@@ -234,7 +300,13 @@ class GameService {
       return stats;
     } catch (error) {
       console.error('Error getting game stats:', error);
-      throw error;
+      return {
+        totalMatches: 0,
+        gameScore: [],
+        matchHistory: [],
+        gameStatus: 'error',
+        gameDuration: 0
+      };
     }
   }
 }
