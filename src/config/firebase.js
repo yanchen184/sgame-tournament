@@ -1,11 +1,10 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v9-compat and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCigfC9SYs8RGwRmF4dAnNJ_qyCu_bFSig",
   authDomain: "squash-72502.firebaseapp.com",
@@ -17,11 +16,34 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+let db;
+let auth;
+let analytics;
 
-// Initialize Firebase services
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const analytics = getAnalytics(app);
+try {
+  app = initializeApp(firebaseConfig);
+  
+  // Initialize Firestore
+  db = getFirestore(app);
+  
+  // Initialize Auth
+  auth = getAuth(app);
+  
+  // Initialize Analytics (only in production)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    analytics = getAnalytics(app);
+  }
+  
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+  
+  // Fallback: create a mock database for development
+  db = null;
+  auth = null;
+  analytics = null;
+}
 
+export { db, auth, analytics };
 export default app;
