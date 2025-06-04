@@ -1,9 +1,9 @@
 import React from 'react';
 import './StatusMessage.css';
 
-const StatusMessage = ({ message, type = 'info' }) => {
+const StatusMessage = ({ message, type = 'info', persistent = false, onClose }) => {
   const getMessageClass = () => {
-    return `status-message ${type}`;
+    return `status-message ${type} ${persistent ? 'persistent' : ''}`;
   };
 
   const getIcon = () => {
@@ -23,6 +23,15 @@ const StatusMessage = ({ message, type = 'info' }) => {
         className="status-text"
         dangerouslySetInnerHTML={{ __html: message }}
       />
+      {persistent && onClose && (
+        <button 
+          className="status-close-btn"
+          onClick={onClose}
+          title="關閉訊息"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 };
