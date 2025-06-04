@@ -20,23 +20,29 @@ const shuffleArray = (array) => {
   return newArray;
 };
 
-// Default player names (randomized each time)
-const getDefaultPlayerNames = () => {
-  const baseNames = ['bob', 'jimmy', 'white', 'dada'];
-  return shuffleArray(baseNames);
+// Default player names (randomized each time) - expanded for up to 8 players
+const getDefaultPlayerNames = (count = 4) => {
+  const baseNames = ['bob', 'jimmy', 'white', 'dada', 'alex', 'sam', 'chris', 'taylor'];
+  const shuffledNames = shuffleArray(baseNames);
+  return shuffledNames.slice(0, count);
 };
 
-// Initial player data template
-const createInitialPlayers = (names = getDefaultPlayerNames()) => [
-  { id: 1, name: names[0] || 'bob', score: 0, winStreak: 0, position: 0, resting: false },
-  { id: 2, name: names[1] || 'jimmy', score: 0, winStreak: 0, position: 1, resting: false },
-  { id: 3, name: names[2] || 'white', score: 0, winStreak: 0, position: 2, resting: false },
-  { id: 4, name: names[3] || 'dada', score: 0, winStreak: 0, position: 3, resting: false }
-];
+// Initial player data template - now supports dynamic player count
+const createInitialPlayers = (names = getDefaultPlayerNames(), playerCount = 4) => {
+  return names.slice(0, playerCount).map((name, index) => ({
+    id: index + 1,
+    name: name || `Player${index + 1}`,
+    score: 0,
+    winStreak: 0,
+    position: index,
+    resting: false
+  }));
+};
 
 function App() {
   const [gameSetup, setGameSetup] = useState(false);
-  const [playerNames, setPlayerNames] = useState(getDefaultPlayerNames());
+  const [playerCount, setPlayerCount] = useState(4); // Dynamic player count
+  const [playerNames, setPlayerNames] = useState(getDefaultPlayerNames(4));
   const [players, setPlayers] = useState([]);
   const [currentFighters, setCurrentFighters] = useState([null, null]);
   const [gameStarted, setGameStarted] = useState(false);
@@ -67,22 +73,23 @@ function App() {
 
   // Initialize game on component mount
   useEffect(() => {
-    if (gameSetup && playerNames.some(name => name.trim())) {
+    if (gameSetup && playerNames.some(name => name.trim()) && playerCount > 0) {
       initGame();
     }
-  }, [gameSetup, playerNames]);
+  }, [gameSetup, playerNames, playerCount]);
 
   // Initialize Firebase game when players are set
   useEffect(() => {
     if (enableFirebase && !gameId && gameSetup && players.length > 0) {
       initFirebaseGame({
-        gameName: '四人單挑循環賽',
+        gameName: `${playerCount}人動態競技系統`,
         players: players,
         gameType: 'tournament',
-        playerNames: playerNames
+        playerNames: playerNames,
+        playerCount: playerCount
       });
     }
-  }, [enableFirebase, gameId, gameSetup, players, initFirebaseGame, playerNames]);
+  }, [enableFirebase, gameId, gameSetup, players, initFirebaseGame, playerNames, playerCount]);
 
   // Save players to Firebase when players state changes
   useEffect(() => {
@@ -99,15 +106,17 @@ function App() {
         currentFighters,
         battleCount,
         gameStarted,
-        gameHistory
+        gameHistory,
+        playerCount
       });
     }
-  }, [players, currentFighters, battleCount, gameStarted, gameHistory, gameId, saveGameState, enableFirebase]);
+  }, [players, currentFighters, battleCount, gameStarted, gameHistory, gameId, saveGameState, enableFirebase, playerCount]);
 
-  // Setup players with custom names and auto-start game
-  const setupPlayers = (names) => {
+  // Setup players with custom names and player count, then auto-start game
+  const setupPlayers = (names, count = 4) => {
+    setPlayerCount(count);
     setPlayerNames(names);
-    const initialPlayers = createInitialPlayers(names);
+    const initialPlayers = createInitialPlayers(names, count);
     const shuffledPlayers = shuffleArray(initialPlayers).map((player, index) => ({
       ...player,
       position: index
@@ -118,14 +127,14 @@ function App() {
     setGameStarted(true);
     setGameEnded(false);
     setupInitialMatch(shuffledPlayers);
-    showStatus('🎮 比賽開始！準備迎戰', 'success');
+    showStatus(`🎮 ${count}人比賽開始！準備迎戰`, 'success');
   };
 
   // Initialize game
   const initGame = () => {
     if (!gameSetup) return;
     
-    const initialPlayers = createInitialPlayers(playerNames);
+    const initialPlayers = createInitialPlayers(playerNames, playerCount);
     const shuffledPlayers = shuffleArray(initialPlayers).map((player, index) => ({
       ...player,
       position: index,
@@ -192,7 +201,8 @@ function App() {
       gameHistory: [...gameHistory],
       showRestOption,
       streakWinner: streakWinner ? { ...streakWinner } : null,
-      gameEnded
+      gameEnded,
+      playerCount
     };
 
     // Keep only last 50 states to prevent memory issues
@@ -219,6 +229,9 @@ function App() {
     setShowRestOption(lastState.showRestOption);
     setStreakWinner(lastState.streakWinner);
     setGameEnded(lastState.gameEnded);
+    if (lastState.playerCount) {
+      setPlayerCount(lastState.playerCount);
+    }
     
     // Remove the used state from undo stack
     setUndoStack(prev => prev.slice(1));
@@ -249,9 +262,15 @@ function App() {
     return matchRecord;
   };
 
-  // Check if player can rest (every 3 wins: 3, 6, 9, etc.)
+  // Check if player can rest (dynamic based on player count: playerCount - 1 wins)
   const canPlayerRest = (winStreak) => {
-    return winStreak > 0 && winStreak % 3 === 0;
+    const requiredWins = playerCount - 1; // Dynamic: 3 players = 2 wins, 4 players = 3 wins, etc.
+    return winStreak > 0 && winStreak % requiredWins === 0;
+  };
+
+  // Get required wins for rest (for display purposes)
+  const getRequiredWinsForRest = () => {
+    return playerCount - 1;
   };
 
   // Declare winner
@@ -289,11 +308,12 @@ function App() {
     const updatedWinner = updatedPlayers.find(p => p.id === winner.id);
     addToHistory(updatedWinner, loser, 'normal');
 
-    // Check if player can rest (every 3 wins: 3, 6, 9, etc.)
+    // Check if player can rest (dynamic based on player count)
     if (canPlayerRest(updatedWinner.winStreak)) {
+      const requiredWins = getRequiredWinsForRest();
       setShowRestOption(true);
       setStreakWinner(updatedWinner);
-      showStatus(`🔥 ${updatedWinner.name} 連勝 ${updatedWinner.winStreak} 場！已打贏所有對手一輪，可選擇加 1 分下場或繼續比賽`, 'special');
+      showStatus(`🔥 ${updatedWinner.name} 連勝 ${updatedWinner.winStreak} 場！已打贏所有對手一輪（${requiredWins}場），可選擇加 1 分下場或繼續比賽`, 'special');
       return;
     }
 
@@ -464,7 +484,8 @@ function App() {
       endFirebaseGame({
         finalRanking: sortedPlayers,
         totalMatches: battleCount,
-        playerNames
+        playerNames,
+        playerCount
       });
     }
   };
@@ -477,8 +498,8 @@ function App() {
     });
 
     setGameSetup(false);
-    // Generate new random player names each time
-    const newPlayerNames = getDefaultPlayerNames();
+    // Generate new random player names each time for current player count
+    const newPlayerNames = getDefaultPlayerNames(playerCount);
     setPlayerNames(newPlayerNames);
     setPlayers([]);
     setCurrentFighters([null, null]);
@@ -523,7 +544,7 @@ function App() {
   if (!gameSetup) {
     return (
       <div className="App">
-        <div className="version">v1.2.1</div>
+        <div className="version">v1.3.0</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -532,7 +553,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.2.1
+        v1.3.0
         {enableFirebase && (
           <span className="firebase-status">
             {isConnected ? '🔥' : '📡'} 
@@ -543,7 +564,7 @@ function App() {
       
       <div className="container">
         <div className="header">
-          <h1 className="title">🥊 四人單挑循環賽系統</h1>
+          <h1 className="title">🥊 動態競技系統 ({playerCount}人)</h1>
           {enableFirebase ? (
             <div className="firebase-info">
               <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
@@ -624,7 +645,7 @@ function App() {
           />
         )}
 
-        <GameRules />
+        <GameRules playerCount={playerCount} />
       </div>
     </div>
   );
