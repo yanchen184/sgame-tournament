@@ -26,7 +26,15 @@ const GameRules = () => {
           <div className="rule-icon">🔥</div>
           <div className="rule-content">
             <h4>連勝獎勵</h4>
-            <p>連勝 3 場可選擇休息並額外得 1 分</p>
+            <p>連勝每 3 場（3、6、9...）可選擇休息並額外得 1 分</p>
+          </div>
+        </div>
+        
+        <div className="rule-item">
+          <div className="rule-icon">😴</div>
+          <div className="rule-content">
+            <h4>休息機制</h4>
+            <p>休息選手會重新排隊，當無其他選手時自動返場</p>
           </div>
         </div>
         
@@ -34,15 +42,7 @@ const GameRules = () => {
           <div className="rule-icon">↶</div>
           <div className="rule-content">
             <h4>撤銷功能</h4>
-            <p>隨時可以撤銷上一步操作，無時間限制</p>
-          </div>
-        </div>
-        
-        <div className="rule-item">
-          <div className="rule-icon">🎯</div>
-          <div className="rule-content">
-            <h4>公平原則</h4>
-            <p>所有選手都有平等的比賽機會</p>
+            <p>可無限撤銷操作，支援連續撤銷，無時間限制</p>
           </div>
         </div>
         
@@ -50,13 +50,14 @@ const GameRules = () => {
           <div className="rule-icon">🏆</div>
           <div className="rule-content">
             <h4>比賽結束</h4>
-            <p>手動結束比賽時按積分最高者獲勝</p>
+            <p>手動結束比賽，最終統計不會自動消失</p>
           </div>
         </div>
       </div>
       
       <div className="rules-footer">
         <p>💡 提示：合理安排體力，適時選擇休息可能更有利於最終勝利！</p>
+        <p>🔄 每次連勝 3 場都可以選擇是否休息獲得額外分數</p>
       </div>
     </div>
   );
