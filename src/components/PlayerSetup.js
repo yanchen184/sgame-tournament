@@ -1,153 +1,147 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './PlayerSetup.css';
 
-const PlayerSetup = ({ onSetupPlayers, initialNames = ['bob', 'jimmy', 'white', 'dada'] }) => {
-  const [playerNames, setPlayerNames] = useState(['', '', '', '']);
-  const [currentStep, setCurrentStep] = useState(0);
+const PlayerSetup = ({ onSetupPlayers, initialNames }) => {
+  const [playerCount, setPlayerCount] = useState(4); // Default 4 players
+  const [playerNames, setPlayerNames] = useState(() => {
+    // Initialize with default names based on player count
+    const defaultNames = ['bob', 'jimmy', 'white', 'dada', 'alex', 'sam', 'chris', 'taylor'];
+    return Array.from({ length: 8 }, (_, i) => initialNames[i] || defaultNames[i] || `選手${i + 1}`);
+  });
+  const [gameStarted, setGameStarted] = useState(false);
 
-  // Initialize with provided names when component mounts
-  useEffect(() => {
-    setPlayerNames([...initialNames]);
-  }, [initialNames]);
+  // Handle player count change
+  const handlePlayerCountChange = (count) => {
+    setPlayerCount(count);
+  };
 
-  const handleNameChange = (index, value) => {
+  // Handle player name change
+  const handleNameChange = (index, name) => {
     const newNames = [...playerNames];
-    newNames[index] = value;
+    newNames[index] = name;
     setPlayerNames(newNames);
   };
 
-  const nextStep = () => {
-    if (currentStep < 3) {
-      setCurrentStep(currentStep + 1);
+  // Generate random names for current player count
+  const generateRandomNames = () => {
+    const randomNames = [
+      'Alex', 'Sam', 'Chris', 'Taylor', 'Jordan', 'Casey', 'Morgan', 'Avery',
+      'Blake', 'Drew', 'Emery', 'Finley', 'Harper', 'Indigo', 'Jamie', 'Kai',
+      'Lane', 'Max', 'Nova', 'Oakley', 'Phoenix', 'Quinn', 'River', 'Sage'
+    ];
+    
+    const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
+    const newNames = [...playerNames];
+    
+    for (let i = 0; i < playerCount; i++) {
+      newNames[i] = shuffled[i] || `選手${i + 1}`;
     }
+    
+    setPlayerNames(newNames);
   };
 
-  const prevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+  // Start game with selected players
+  const startGame = () => {
+    const selectedNames = playerNames.slice(0, playerCount).filter(name => name.trim());
+    
+    if (selectedNames.length !== playerCount) {
+      alert(`請填入 ${playerCount} 位選手的名字！`);
+      return;
     }
+
+    setGameStarted(true);
+    onSetupPlayers(selectedNames, playerCount);
   };
 
-  const handleSubmit = () => {
-    const finalNames = playerNames.map((name, index) => 
-      name.trim() || initialNames[index] || `選手 ${String.fromCharCode(65 + index)}`
+  if (gameStarted) {
+    return (
+      <div className="setup-container">
+        <div className="loading-animation">
+          <div className="loading-spinner"></div>
+          <h2>🎮 正在準備比賽...</h2>
+        </div>
+      </div>
     );
-    onSetupPlayers(finalNames);
-  };
-
-  const canProceed = playerNames[currentStep].trim().length > 0;
-  const allFilled = playerNames.every(name => name.trim().length > 0);
+  }
 
   return (
     <div className="setup-container">
-      <div className="setup-modal">
+      <div className="setup-card">
         <div className="setup-header">
-          <h2>🥊 四人單挑循環賽設置</h2>
-          <p>請輸入四位參賽選手的名字</p>
+          <h1 className="setup-title">🥊 設置比賽</h1>
+          <p className="setup-subtitle">自定義參賽人數和選手名稱</p>
         </div>
 
-        <div className="setup-progress">
-          <div className="progress-bar">
-            <div 
-              className="progress-fill" 
-              style={{ width: `${((currentStep + 1) / 4) * 100}%` }}
-            ></div>
+        {/* Player Count Selection */}
+        <div className="player-count-section">
+          <h3>👥 參賽人數</h3>
+          <div className="count-buttons">
+            {[3, 4, 5, 6, 7, 8].map(count => (
+              <button
+                key={count}
+                className={`count-btn ${playerCount === count ? 'active' : ''}`}
+                onClick={() => handlePlayerCountChange(count)}
+              >
+                {count} 人
+              </button>
+            ))}
           </div>
-          <div className="progress-text">
-            步驟 {currentStep + 1} / 4
-          </div>
-        </div>
-
-        <div className="setup-content">
-          <div className="player-input-section">
-            <div className="player-avatar">
-              🥊
-            </div>
-            <h3>第 {currentStep + 1} 位選手</h3>
-            <input
-              type="text"
-              value={playerNames[currentStep]}
-              onChange={(e) => handleNameChange(currentStep, e.target.value)}
-              placeholder={`輸入第 ${currentStep + 1} 位選手名字... (預設: ${initialNames[currentStep]})`}
-              className="player-name-input"
-              maxLength={12}
-              autoFocus
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && canProceed) {
-                  if (currentStep < 3) {
-                    nextStep();
-                  } else {
-                    handleSubmit();
-                  }
-                }
-              }}
-            />
-            <div className="input-hint">
-              {playerNames[currentStep].length}/12 字符
-            </div>
-          </div>
-
-          <div className="players-preview">
-            <h4>已設置的選手：</h4>
-            <div className="preview-list">
-              {playerNames.map((name, index) => (
-                <div 
-                  key={index} 
-                  className={`preview-item ${index === currentStep ? 'current' : ''} ${name.trim() ? 'filled' : 'empty'}`}
-                >
-                  <span className="preview-number">{index + 1}</span>
-                  <span className="preview-name">
-                    {name.trim() || initialNames[index] || `選手 ${String.fromCharCode(65 + index)}`}
-                  </span>
-                  {index <= currentStep && name.trim() && (
-                    <span className="preview-check">✓</span>
-                  )}
-                </div>
-              ))}
-            </div>
+          <div className="count-info">
+            <p>連勝 <strong>{playerCount - 1}</strong> 場（打滿一輪）可選擇休息 +1 分</p>
           </div>
         </div>
 
-        <div className="setup-controls">
-          <button 
-            className="btn secondary" 
-            onClick={prevStep}
-            disabled={currentStep === 0}
-          >
-            ← 上一步
-          </button>
-
-          {currentStep < 3 ? (
+        {/* Player Names Input */}
+        <div className="names-section">
+          <div className="names-header">
+            <h3>✏️ 選手名稱</h3>
             <button 
-              className="btn primary" 
-              onClick={nextStep}
-              disabled={!canProceed}
+              className="random-btn"
+              onClick={generateRandomNames}
+              type="button"
             >
-              下一步 →
-            </button>
-          ) : (
-            <button 
-              className="btn success" 
-              onClick={handleSubmit}
-            >
-              🎮 開始比賽
-            </button>
-          )}
-        </div>
-
-        <div className="setup-footer">
-          <div className="quick-setup">
-            <button 
-              className="btn outline" 
-              onClick={() => onSetupPlayers(initialNames)}
-            >
-              ⚡ 使用預設名稱快速開始 ({initialNames.join(', ')})
+              🎲 隨機名字
             </button>
           </div>
           
-          <div className="setup-tips">
-            <p>💡 提示：你可以隨時在遊戲中重置並重新設定選手名稱</p>
+          <div className="names-grid">
+            {Array.from({ length: playerCount }, (_, index) => (
+              <div key={index} className="name-input-group">
+                <label htmlFor={`player-${index}`}>
+                  選手 {index + 1}
+                </label>
+                <input
+                  id={`player-${index}`}
+                  type="text"
+                  value={playerNames[index] || ''}
+                  onChange={(e) => handleNameChange(index, e.target.value)}
+                  placeholder={`輸入選手 ${index + 1} 的名字`}
+                  maxLength="20"
+                />
+              </div>
+            ))}
           </div>
+        </div>
+
+        {/* Game Rules Preview */}
+        <div className="rules-preview">
+          <h4>📋 比賽規則預覽</h4>
+          <ul>
+            <li>🥊 {playerCount} 人循環單挑賽制</li>
+            <li>🔥 連勝 {playerCount - 1} 場可選擇休息並獲得 +1 分</li>
+            <li>↶ 支援無限撤銷操作</li>
+            <li>📱 針對手機使用優化</li>
+          </ul>
+        </div>
+
+        {/* Start Game Button */}
+        <div className="start-section">
+          <button 
+            className="start-game-btn"
+            onClick={startGame}
+          >
+            🚀 開始 {playerCount} 人比賽
+          </button>
         </div>
       </div>
     </div>
