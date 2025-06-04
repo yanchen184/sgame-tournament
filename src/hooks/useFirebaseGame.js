@@ -2,7 +2,264 @@ import { useState, useEffect, useCallback } from 'react';
 import gameService from '../services/gameService';
 
 /**
- * Custom hook for managing Firebase game state
+ * Generate a unique room code
+ */
+const generateRoomCode = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+/**
+ * Custom hook for managing Firebase multiplayer rooms
+ * @param {boolean} enableFirebase - Whether to enable Firebase integration
+ * @returns {Object} - Room state and functions
+ */
+export const useFirebaseRoom = (enableFirebase = false) => {
+  const [roomId, setRoomId] = useState(null);
+  const [roomCode, setRoomCode] = useState(null);
+  const [isRoomHost, setIsRoomHost] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [roomData, setRoomData] = useState(null);
+
+  /**
+   * Create a new multiplayer room
+   * @param {Object} initialGameData - Initial game data
+   */
+  const createRoom = useCallback(async (initialGameData) => {
+    if (!enableFirebase) return null;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      const newRoomCode = generateRoomCode();
+      const roomData = {
+        ...initialGameData,
+        roomCode: newRoomCode,
+        isMultiplayer: true,
+        hostId: 'user_' + Date.now(), // Simple user ID for demo
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        status: 'active'
+      };
+      
+      const newRoomId = await gameService.createRoom(roomData);
+      
+      setRoomId(newRoomId);
+      setRoomCode(newRoomCode);
+      setIsRoomHost(true);
+      setIsConnected(true);
+      
+      return { roomId: newRoomId, roomCode: newRoomCode };
+    } catch (err) {
+      console.error('Failed to create room:', err);
+      setError('無法創建房間');
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [enableFirebase]);
+
+  /**
+   * Join an existing room by room code
+   * @param {string} code - Room code to join
+   */
+  const joinRoom = useCallback(async (code) => {
+    if (!enableFirebase) return null;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      const foundRoomId = await gameService.findRoomByCode(code);
+      if (!foundRoomId) {
+        setError('找不到房間號碼');
+        return null;
+      }
+      
+      const roomGameData = await gameService.getRoom(foundRoomId);
+      if (!roomGameData) {
+        setError('無法載入房間資料');
+        return null;
+      }
+      
+      setRoomId(foundRoomId);
+      setRoomCode(code);
+      setIsRoomHost(false);
+      setIsConnected(true);
+      setRoomData(roomGameData);
+      
+      // Update room activity
+      await gameService.updateRoomActivity(foundRoomId);
+      
+      return roomGameData;
+    } catch (err) {
+      console.error('Failed to join room:', err);
+      setError('無法加入房間');
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [enableFirebase]);
+
+  /**
+   * Get list of active rooms
+   */
+  const getActiveRooms = useCallback(async () => {
+    if (!enableFirebase) return [];
+
+    try {
+      const rooms = await gameService.getActiveRooms();
+      return rooms;
+    } catch (err) {
+      console.error('Failed to load active rooms:', err);
+      setError('無法載入房間列表');
+      return [];
+    }
+  }, [enableFirebase]);
+
+  /**
+   * Update game state in the room
+   * @param {Object} gameState - Current game state
+   */
+  const updateRoomGameState = useCallback(async (gameState) => {
+    if (!enableFirebase || !roomId) return;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      await gameService.updateRoomGameState(roomId, gameState);
+      await gameService.updateRoomActivity(roomId);
+    } catch (err) {
+      console.error('Failed to update room game state:', err);
+      setError('無法同步遊戲狀態');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [enableFirebase, roomId]);
+
+  /**
+   * End the room (only host can do this)
+   * @param {Object} finalResults - Final game results
+   */
+  const endRoom = useCallback(async (finalResults) => {
+    if (!enableFirebase || !roomId || !isRoomHost) return;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      await gameService.endRoom(roomId, finalResults);
+      setIsConnected(false);
+    } catch (err) {
+      console.error('Failed to end room:', err);
+      setError('無法結束房間');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [enableFirebase, roomId, isRoomHost]);
+
+  /**
+   * Leave the room
+   */
+  const leaveRoom = useCallback(() => {
+    setRoomId(null);
+    setRoomCode(null);
+    setIsRoomHost(false);
+    setIsConnected(false);
+    setRoomData(null);
+    setError(null);
+  }, []);
+
+  /**
+   * Clear error state
+   */
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    // State
+    roomId,
+    roomCode,
+    isRoomHost,
+    isConnected,
+    isSaving,
+    error,
+    roomData,
+    
+    // Functions
+    createRoom,
+    joinRoom,
+    getActiveRooms,
+    updateRoomGameState,
+    endRoom,
+    leaveRoom,
+    clearError
+  };
+};
+
+/**
+ * Custom hook for real-time room subscriptions
+ * @param {string} roomId - Room ID to subscribe to
+ * @param {boolean} enabled - Whether subscription is enabled
+ * @returns {Object} - Real-time room data and subscription state
+ */
+export const useRealtimeRoom = (roomId, enabled = false) => {
+  const [roomData, setRoomData] = useState(null);
+  const [gameData, setGameData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!enabled || !roomId) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    // Subscribe to real-time room updates
+    const unsubscribe = gameService.subscribeToRoom(
+      roomId,
+      (data) => {
+        setRoomData(data);
+        if (data && data.gameState) {
+          setGameData(data.gameState);
+        }
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Room subscription error:', error);
+        setError('即時同步連接中斷');
+        setIsLoading(false);
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [roomId, enabled]);
+
+  return {
+    roomData,
+    gameData,
+    isLoading,
+    error
+  };
+};
+
+/**
+ * Legacy hook for backward compatibility
+ * Enhanced to support both single-player and multiplayer modes
  * @param {boolean} enableFirebase - Whether to enable Firebase integration
  * @returns {Object} - Game state and functions
  */
@@ -178,7 +435,7 @@ export const useFirebaseGame = (enableFirebase = false) => {
 };
 
 /**
- * Custom hook for real-time game subscriptions
+ * Custom hook for real-time game subscriptions (legacy)
  * @param {string} gameId - Game ID to subscribe to
  * @param {boolean} enabled - Whether subscription is enabled
  * @returns {Object} - Real-time game data and subscription state
