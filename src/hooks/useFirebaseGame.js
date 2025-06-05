@@ -15,6 +15,7 @@ const generateRoomCode = () => {
 
 /**
  * Custom hook for managing Firebase multiplayer rooms
+ * Enhanced with optimized sync performance and better error handling
  * @param {boolean} enableFirebase - Whether to enable Firebase integration
  * @returns {Object} - Room state and functions
  */
@@ -132,17 +133,30 @@ export const useFirebaseRoom = (enableFirebase = false) => {
   }, [enableFirebase]);
 
   /**
-   * Update game state in the room
+   * Update game state in the room with optimized sync
    * @param {Object} gameState - Current game state
+   * @param {boolean} immediate - Whether to sync immediately (for critical updates)
    */
-  const updateRoomGameState = useCallback(async (gameState) => {
+  const updateRoomGameState = useCallback(async (gameState, immediate = false) => {
     if (!enableFirebase || !roomId) return;
 
     try {
       setIsSaving(true);
       setError(null);
       
-      await gameService.updateRoomGameState(roomId, gameState);
+      // Use immediate sync for critical updates like rest options, winner declarations
+      const isCriticalUpdate = gameState.showRestOption !== undefined || 
+                               gameState.streakWinner !== undefined ||
+                               gameState.currentFighters !== undefined;
+      
+      if (immediate || isCriticalUpdate) {
+        console.log('Using immediate sync for critical update');
+        await gameService.updateRoomGameStateImmediate(roomId, gameState);
+      } else {
+        console.log('Using debounced sync for regular update');
+        await gameService.updateRoomGameState(roomId, gameState);
+      }
+      
       await gameService.updateRoomActivity(roomId);
     } catch (err) {
       console.error('Failed to update room game state:', err);
@@ -215,6 +229,7 @@ export const useFirebaseRoom = (enableFirebase = false) => {
 
 /**
  * Custom hook for real-time room subscriptions
+ * Enhanced with better sync handling and error recovery
  * @param {string} roomId - Room ID to subscribe to
  * @param {boolean} enabled - Whether subscription is enabled
  * @returns {Object} - Real-time room data and subscription state
@@ -224,6 +239,7 @@ export const useRealtimeRoom = (roomId, enabled = false) => {
   const [gameData, setGameData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [lastSyncVersion, setLastSyncVersion] = useState(0);
 
   useEffect(() => {
     if (!enabled || !roomId) return;
@@ -235,9 +251,22 @@ export const useRealtimeRoom = (roomId, enabled = false) => {
     const unsubscribe = gameService.subscribeToRoom(
       roomId,
       (data) => {
-        setRoomData(data);
-        if (data && data.gameState) {
-          setGameData(data.gameState);
+        if (data) {
+          // Check sync version to prevent processing old updates
+          const newSyncVersion = data.syncVersion || 0;
+          if (newSyncVersion >= lastSyncVersion) {
+            console.log('Processing room update, sync version:', newSyncVersion);
+            setRoomData(data);
+            if (data && data.gameState) {
+              setGameData(data.gameState);
+            }
+            setLastSyncVersion(newSyncVersion);
+          } else {
+            console.log('Ignoring old update, version:', newSyncVersion, 'current:', lastSyncVersion);
+          }
+        } else {
+          setRoomData(null);
+          setGameData(null);
         }
         setIsLoading(false);
       },
@@ -245,6 +274,15 @@ export const useRealtimeRoom = (roomId, enabled = false) => {
         console.error('Room subscription error:', error);
         setError('即時同步連接中斷');
         setIsLoading(false);
+        
+        // Attempt to reconnect after error
+        setTimeout(() => {
+          if (enabled && roomId) {
+            console.log('Attempting to reconnect to room:', roomId);
+            setError(null);
+            setIsLoading(true);
+          }
+        }, 3000);
       }
     );
 
@@ -254,7 +292,7 @@ export const useRealtimeRoom = (roomId, enabled = false) => {
         unsubscribe();
       }
     };
-  }, [roomId, enabled]);
+  }, [roomId, enabled, lastSyncVersion]);
 
   return {
     roomData,

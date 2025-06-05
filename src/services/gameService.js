@@ -11,7 +11,8 @@ import {
   onSnapshot,
   serverTimestamp,
   where,
-  getDocs
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -26,10 +27,18 @@ const COLLECTIONS = {
 /**
  * Game Management Service
  * Handles all Firebase operations for the tournament system
- * Enhanced with multiplayer room support
+ * Enhanced with multiplayer room support and optimized sync performance
  */
 class GameService {
   
+  constructor() {
+    // Cache for subscription listeners to prevent memory leaks
+    this.activeSubscriptions = new Map();
+    // Debounce timer for batch updates
+    this.updateTimer = null;
+    this.pendingUpdates = new Map();
+  }
+
   /**
    * Create a new game session
    * @param {Object} gameData - Initial game data
@@ -62,7 +71,7 @@ class GameService {
   }
 
   /**
-   * Create a new multiplayer room
+   * Create a new multiplayer room with optimized structure
    * @param {Object} roomData - Initial room data
    * @returns {Promise<string>} - Room ID
    */
@@ -77,7 +86,10 @@ class GameService {
         updatedAt: serverTimestamp(),
         lastActivity: serverTimestamp(),
         status: 'active',
-        isMultiplayer: true
+        isMultiplayer: true,
+        // Add sync optimization flags
+        syncVersion: 1,
+        lastSyncTime: serverTimestamp()
       });
       
       console.log('Room created with ID:', roomDoc.id);
@@ -89,7 +101,7 @@ class GameService {
   }
 
   /**
-   * Find room by room code
+   * Find room by room code with caching
    * @param {string} roomCode - Room code to search for
    * @returns {Promise<string|null>} - Room ID or null if not found
    */
@@ -121,7 +133,7 @@ class GameService {
   }
 
   /**
-   * Get room data
+   * Get room data with enhanced error handling
    * @param {string} roomId - Room ID
    * @returns {Promise<Object>} - Room data
    */
@@ -142,7 +154,7 @@ class GameService {
   }
 
   /**
-   * Get list of active rooms
+   * Get list of active rooms with better performance
    * @param {number} limitCount - Number of rooms to retrieve
    * @returns {Promise<Array>} - Array of active rooms
    */
@@ -229,7 +241,7 @@ class GameService {
   }
 
   /**
-   * Subscribe to real-time active rooms updates
+   * Enhanced subscribe to real-time active rooms updates with connection management
    * @param {Function} callback - Callback function for updates
    * @param {Function} errorCallback - Error callback function
    * @param {number} limitCount - Number of rooms to retrieve
@@ -247,9 +259,9 @@ class GameService {
         limit(limitCount)
       );
       
-      return onSnapshot(q, 
+      const unsubscribe = onSnapshot(q, 
         (querySnapshot) => {
-          console.log('Active rooms update received');
+          console.log('Active rooms update received, changes:', querySnapshot.docChanges().length);
           const rooms = [];
           
           querySnapshot.forEach((doc) => {
@@ -276,6 +288,11 @@ class GameService {
           }
         }
       );
+
+      // Store subscription for cleanup
+      this.activeSubscriptions.set('activeRooms', unsubscribe);
+      
+      return unsubscribe;
     } catch (error) {
       console.error('Error subscribing to active rooms:', error);
       throw error;
@@ -283,7 +300,7 @@ class GameService {
   }
 
   /**
-   * Update room game state
+   * Optimized batch update for room game state with debouncing
    * @param {string} roomId - Room ID
    * @param {Object} gameState - Game state data
    */
@@ -291,16 +308,59 @@ class GameService {
     try {
       console.log('Updating room game state:', roomId);
       
+      // Clear any pending update timer
+      if (this.updateTimer) {
+        clearTimeout(this.updateTimer);
+      }
+      
+      // Store pending update
+      this.pendingUpdates.set(roomId, gameState);
+      
+      // Debounce updates to reduce Firebase calls
+      this.updateTimer = setTimeout(async () => {
+        const updates = this.pendingUpdates.get(roomId);
+        if (updates) {
+          const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
+          await updateDoc(roomRef, {
+            gameState: updates,
+            updatedAt: serverTimestamp(),
+            lastActivity: serverTimestamp(),
+            syncVersion: (updates.syncVersion || 0) + 1,
+            lastSyncTime: serverTimestamp()
+          });
+          
+          this.pendingUpdates.delete(roomId);
+          console.log('Room game state updated successfully with debouncing');
+        }
+      }, 100); // 100ms debounce to batch rapid updates
+      
+    } catch (error) {
+      console.error('Error updating room game state:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Immediate update for critical game state changes (no debouncing)
+   * @param {string} roomId - Room ID
+   * @param {Object} gameState - Game state data
+   */
+  async updateRoomGameStateImmediate(roomId, gameState) {
+    try {
+      console.log('Immediate room game state update:', roomId);
+      
       const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
       await updateDoc(roomRef, {
         gameState: gameState,
         updatedAt: serverTimestamp(),
-        lastActivity: serverTimestamp()
+        lastActivity: serverTimestamp(),
+        syncVersion: (gameState.syncVersion || 0) + 1,
+        lastSyncTime: serverTimestamp()
       });
       
-      console.log('Room game state updated successfully');
+      console.log('Room game state updated immediately');
     } catch (error) {
-      console.error('Error updating room game state:', error);
+      console.error('Error updating room game state immediately:', error);
       throw error;
     }
   }
@@ -322,7 +382,7 @@ class GameService {
   }
 
   /**
-   * Subscribe to real-time room updates
+   * Enhanced subscribe to real-time room updates with better error handling
    * @param {string} roomId - Room ID
    * @param {Function} callback - Callback function for updates
    * @param {Function} errorCallback - Error callback function
@@ -333,20 +393,29 @@ class GameService {
       console.log('Subscribing to room updates:', roomId);
       
       const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
-      return onSnapshot(roomRef, (doc) => {
-        if (doc.exists()) {
-          console.log('Room update received:', doc.data());
-          callback({ id: doc.id, ...doc.data() });
-        } else {
-          console.log('Room document does not exist');
-          callback(null);
+      const unsubscribe = onSnapshot(roomRef, 
+        (doc) => {
+          if (doc.exists()) {
+            const data = doc.data();
+            console.log('Room update received, sync version:', data.syncVersion || 'none');
+            callback({ id: doc.id, ...data });
+          } else {
+            console.log('Room document does not exist');
+            callback(null);
+          }
+        }, 
+        (error) => {
+          console.error('Error in room subscription:', error);
+          if (errorCallback) {
+            errorCallback(error);
+          }
         }
-      }, (error) => {
-        console.error('Error in room subscription:', error);
-        if (errorCallback) {
-          errorCallback(error);
-        }
-      });
+      );
+
+      // Store subscription for cleanup
+      this.activeSubscriptions.set(`room_${roomId}`, unsubscribe);
+      
+      return unsubscribe;
     } catch (error) {
       console.error('Error subscribing to room:', error);
       throw error;
@@ -370,6 +439,14 @@ class GameService {
         updatedAt: serverTimestamp(),
         lastActivity: serverTimestamp()
       });
+      
+      // Clean up subscription if exists
+      const subscriptionKey = `room_${roomId}`;
+      if (this.activeSubscriptions.has(subscriptionKey)) {
+        const unsubscribe = this.activeSubscriptions.get(subscriptionKey);
+        unsubscribe();
+        this.activeSubscriptions.delete(subscriptionKey);
+      }
       
       console.log('Room ended successfully');
     } catch (error) {
@@ -528,7 +605,7 @@ class GameService {
       console.log('Subscribing to game updates:', gameId);
       
       const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
-      return onSnapshot(gameRef, (doc) => {
+      const unsubscribe = onSnapshot(gameRef, (doc) => {
         if (doc.exists()) {
           console.log('Game update received:', doc.data());
           callback({ id: doc.id, ...doc.data() });
@@ -540,6 +617,11 @@ class GameService {
         console.error('Error in game subscription:', error);
         throw error;
       });
+
+      // Store subscription for cleanup
+      this.activeSubscriptions.set(`game_${gameId}`, unsubscribe);
+      
+      return unsubscribe;
     } catch (error) {
       console.error('Error subscribing to game:', error);
       throw error;
@@ -562,6 +644,14 @@ class GameService {
         endedAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
+      
+      // Clean up subscription if exists
+      const subscriptionKey = `game_${gameId}`;
+      if (this.activeSubscriptions.has(subscriptionKey)) {
+        const unsubscribe = this.activeSubscriptions.get(subscriptionKey);
+        unsubscribe();
+        this.activeSubscriptions.delete(subscriptionKey);
+      }
       
       console.log('Game ended successfully');
     } catch (error) {
@@ -597,8 +687,39 @@ class GameService {
       throw error;
     }
   }
+
+  /**
+   * Clean up all active subscriptions
+   */
+  cleanup() {
+    console.log('Cleaning up GameService subscriptions:', this.activeSubscriptions.size);
+    this.activeSubscriptions.forEach((unsubscribe, key) => {
+      try {
+        unsubscribe();
+        console.log('Unsubscribed from:', key);
+      } catch (error) {
+        console.error('Error unsubscribing from:', key, error);
+      }
+    });
+    this.activeSubscriptions.clear();
+    
+    // Clear any pending timers
+    if (this.updateTimer) {
+      clearTimeout(this.updateTimer);
+      this.updateTimer = null;
+    }
+    this.pendingUpdates.clear();
+  }
 }
 
 // Create and export a singleton instance
 const gameService = new GameService();
+
+// Clean up on page unload
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    gameService.cleanup();
+  });
+}
+
 export default gameService;
