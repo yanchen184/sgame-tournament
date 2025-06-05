@@ -89,6 +89,12 @@ export const useFirebaseRoom = (enableFirebase = false) => {
         return null;
       }
       
+      // Check if room is still active
+      if (roomGameData.status !== 'active') {
+        setError('房間已結束');
+        return null;
+      }
+      
       setRoomId(foundRoomId);
       setRoomCode(code);
       setIsRoomHost(false);
@@ -109,14 +115,15 @@ export const useFirebaseRoom = (enableFirebase = false) => {
   }, [enableFirebase]);
 
   /**
-   * Get list of active rooms
+   * Get list of active rooms (only show active rooms)
    */
   const getActiveRooms = useCallback(async () => {
     if (!enableFirebase) return [];
 
     try {
       const rooms = await gameService.getActiveRooms();
-      return rooms;
+      // Filter to only show active rooms
+      return rooms.filter(room => room.status === 'playing' || room.status === 'active');
     } catch (err) {
       console.error('Failed to load active rooms:', err);
       setError('無法載入房間列表');
@@ -146,11 +153,11 @@ export const useFirebaseRoom = (enableFirebase = false) => {
   }, [enableFirebase, roomId]);
 
   /**
-   * End the room (only host can do this)
+   * End the room (both host and guests can do this now)
    * @param {Object} finalResults - Final game results
    */
   const endRoom = useCallback(async (finalResults) => {
-    if (!enableFirebase || !roomId || !isRoomHost) return;
+    if (!enableFirebase || !roomId) return;
 
     try {
       setIsSaving(true);
@@ -164,7 +171,7 @@ export const useFirebaseRoom = (enableFirebase = false) => {
     } finally {
       setIsSaving(false);
     }
-  }, [enableFirebase, roomId, isRoomHost]);
+  }, [enableFirebase, roomId]);
 
   /**
    * Leave the room
