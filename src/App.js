@@ -28,14 +28,16 @@ const getDefaultPlayerNames = (count = 4) => {
   return baseNames.slice(0, count);
 };
 
-// Initial player data template - now supports dynamic player count, removed resting flag
+// Initial player data template - now supports dynamic player count
 const createInitialPlayers = (names = getDefaultPlayerNames(), playerCount = 4) => {
   return names.slice(0, playerCount).map((name, index) => ({
     id: index + 1,
     name: name || `Player${index + 1}`,
     score: 0,
     winStreak: 0,
-    position: index
+    position: index,
+    // Track who this player has been defeated by in current round
+    defeatedBy: []
   }));
 };
 
@@ -62,6 +64,10 @@ function App() {
   const [gameHistory, setGameHistory] = useState([]);
   const [gameEnded, setGameEnded] = useState(false);
   const [undoStack, setUndoStack] = useState([]);
+  
+  // New state to track current champion and their opponents they've beaten this round
+  const [currentChampion, setCurrentChampion] = useState(null);
+  const [championBeatenOpponents, setChampionBeatenOpponents] = useState([]);
 
   // Enable Firebase integration
   const enableFirebase = true;
@@ -134,6 +140,13 @@ function App() {
       if (realtimeGameData.streakWinner !== undefined) {
         setStreakWinner(realtimeGameData.streakWinner);
       }
+      // Sync champion tracking state
+      if (realtimeGameData.currentChampion !== undefined) {
+        setCurrentChampion(realtimeGameData.currentChampion);
+      }
+      if (realtimeGameData.championBeatenOpponents) {
+        setChampionBeatenOpponents(realtimeGameData.championBeatenOpponents);
+      }
     }
   }, [realtimeGameData, isMultiplayer]);
 
@@ -173,6 +186,9 @@ function App() {
         // Load rest option and streak winner state
         setShowRestOption(gameState.showRestOption || false);
         setStreakWinner(gameState.streakWinner || null);
+        // Load champion tracking state
+        setCurrentChampion(gameState.currentChampion || null);
+        setChampionBeatenOpponents(gameState.championBeatenOpponents || []);
         
         setIsMultiplayer(true);
         setGameSetup(true);
@@ -209,6 +225,11 @@ function App() {
     setGameSetup(true);
     setGameStarted(true);
     setGameEnded(false);
+    
+    // Initialize champion tracking
+    setCurrentChampion(shuffledPlayers[0]);
+    setChampionBeatenOpponents([]);
+    
     setupInitialMatch(shuffledPlayers);
     
     // Create room if in multiplayer mode
@@ -231,7 +252,10 @@ function App() {
             playerNames: names,
             // Include rest option state in initial sync
             showRestOption: false,
-            streakWinner: null
+            streakWinner: null,
+            // Include champion tracking in initial sync
+            currentChampion: shuffledPlayers[0],
+            championBeatenOpponents: []
           }
         });
         
@@ -259,7 +283,7 @@ function App() {
     }
   };
 
-  // Enhanced sync function for multiplayer - anyone can sync now
+  // Enhanced sync function for multiplayer
   const syncGameStateToRoom = async (gameState) => {
     if (isMultiplayer) {
       try {
@@ -271,7 +295,7 @@ function App() {
     }
   };
 
-  // Declare winner function - anyone can use now
+  // Enhanced declare winner function with proper tournament rotation logic
   const declareWinner = async (winnerIndex) => {
     if (!currentFighters[0] || !currentFighters[1] || gameEnded) return;
 
@@ -285,7 +309,9 @@ function App() {
       battleCount,
       gameHistory: [...gameHistory],
       showRestOption,
-      streakWinner
+      streakWinner,
+      currentChampion,
+      championBeatenOpponents: [...championBeatenOpponents]
     };
     setUndoStack(prev => [...prev, currentState]);
 
@@ -321,17 +347,40 @@ function App() {
     };
     setGameHistory(prev => [...prev, matchResult]);
 
-    // Check for win streak - New simplified rest rule
-    const updatedWinner = updatedPlayers.find(p => p.id === winner.id);
-    const shouldShowRest = updatedWinner.winStreak >= 3;
-    
-    if (shouldShowRest) {
-      setStreakWinner(updatedWinner);
-      setShowRestOption(true);
-      showStatus(`🔥 ${winner.name} 三連勝！可以選擇休息獲得1分或繼續比賽`, 'warning', true);
+    // Update champion tracking
+    let newChampion = currentChampion;
+    let newBeatenOpponents = [...championBeatenOpponents];
+    let shouldShowRest = false;
+
+    if (winner.id === currentChampion?.id) {
+      // Current champion wins - add loser to beaten list if not already there
+      if (!newBeatenOpponents.some(op => op.id === loser.id)) {
+        newBeatenOpponents.push(loser);
+      }
+      
+      // Check if champion has beaten all other players (completed a full round)
+      const otherPlayers = updatedPlayers.filter(p => p.id !== winner.id);
+      const hasBeatenAll = otherPlayers.every(player => 
+        newBeatenOpponents.some(beaten => beaten.id === player.id)
+      );
+      
+      if (hasBeatenAll) {
+        shouldShowRest = true;
+        setStreakWinner(updatedPlayers.find(p => p.id === winner.id));
+        setShowRestOption(true);
+        showStatus(`🏆 ${winner.name} 完成一輪挑戰！可以選擇休息獲得1分或繼續比賽`, 'warning', true);
+      } else {
+        setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
+      }
     } else {
-      setupNextMatch(updatedPlayers, loser);
+      // Champion lost - new champion takes over
+      newChampion = updatedPlayers.find(p => p.id === winner.id);
+      newBeatenOpponents = [loser]; // Start fresh with just beaten the previous champion
+      setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
     }
+
+    setCurrentChampion(newChampion);
+    setChampionBeatenOpponents(newBeatenOpponents);
 
     // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
@@ -346,7 +395,10 @@ function App() {
         playerNames,
         // Include rest option and streak winner in sync
         showRestOption: shouldShowRest,
-        streakWinner: shouldShowRest ? updatedWinner : null
+        streakWinner: shouldShowRest ? updatedPlayers.find(p => p.id === winner.id) : null,
+        // Include champion tracking in sync
+        currentChampion: newChampion,
+        championBeatenOpponents: newBeatenOpponents
       };
       await syncGameStateToRoom(newGameState);
     }
@@ -354,42 +406,46 @@ function App() {
     showStatus(`🎉 ${winner.name} 獲勝！`, 'success');
   };
 
-  // Setup next match
-  const setupNextMatch = (playerList, lastLoser) => {
-    const availablePlayers = playerList;
+  // Enhanced setup next match - find next challenger for current champion
+  const setupNextMatch = (playerList, champion, beatenOpponents) => {
+    // Find players who haven't been beaten by current champion yet
+    const availableChallengers = playerList.filter(player => 
+      player.id !== champion.id && 
+      !beatenOpponents.some(beaten => beaten.id === player.id)
+    );
     
-    if (availablePlayers.length < 2) {
+    if (availableChallengers.length === 0) {
+      // This shouldn't happen, but if it does, end the game
       endGame();
       return;
     }
 
-    // Find the next challenger (after the loser)
-    const loserPosition = lastLoser.position;
+    // Get next challenger in rotation order
+    const championPosition = champion.position;
     let nextChallenger = null;
     
-    // Look for next available player in queue order
-    for (let i = 1; i <= playerList.length; i++) {
-      const nextPosition = (loserPosition + i) % playerList.length;
+    // Find the next available challenger after champion's position
+    for (let i = 1; i < playerList.length; i++) {
+      const nextPosition = (championPosition + i) % playerList.length;
       const candidate = playerList.find(p => p.position === nextPosition);
-      if (candidate && !currentFighters.some(f => f && f.id === candidate.id)) {
+      if (candidate && availableChallengers.some(ac => ac.id === candidate.id)) {
         nextChallenger = candidate;
         break;
       }
     }
 
     if (nextChallenger) {
-      const winner = currentFighters.find(f => f.id !== lastLoser.id);
-      setCurrentFighters([winner, nextChallenger]);
+      setCurrentFighters([champion, nextChallenger]);
     } else {
       endGame();
     }
   };
 
-  // Handle rest option - anyone can use now
+  // Handle rest option - champion gets bonus point and resets for new round
   const handleTakeRest = async () => {
     if (!streakWinner) return;
 
-    // Give the streak winner 1 additional point but keep them in rotation
+    // Give the champion 1 additional point and reset the round
     const updatedPlayers = players.map(player => {
       if (player.id === streakWinner.id) {
         return { 
@@ -405,12 +461,16 @@ function App() {
     setStreakWinner(null);
     setShowRestOption(false);
     
-    // Continue normal rotation - find next opponent for the streak winner
-    const restWinner = updatedPlayers.find(p => p.id === streakWinner.id);
-    const nextChallenger = findNextOpponent(updatedPlayers, restWinner);
+    // Reset champion tracking for new round - champion can continue or step down
+    setCurrentChampion(updatedPlayers.find(p => p.id === streakWinner.id));
+    setChampionBeatenOpponents([]);
+    
+    // Find next challenger for the rested champion to start new round
+    const restedChampion = updatedPlayers.find(p => p.id === streakWinner.id);
+    const nextChallenger = findNextOpponent(updatedPlayers, restedChampion);
     
     if (nextChallenger) {
-      setCurrentFighters([restWinner, nextChallenger]);
+      setCurrentFighters([restedChampion, nextChallenger]);
     } else {
       endGame();
     }
@@ -419,7 +479,7 @@ function App() {
     if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
-        currentFighters: [restWinner, nextChallenger],
+        currentFighters: [restedChampion, nextChallenger],
         battleCount,
         gameHistory,
         gameStarted: true,
@@ -428,15 +488,18 @@ function App() {
         playerNames,
         // Reset rest option state in sync
         showRestOption: false,
-        streakWinner: null
+        streakWinner: null,
+        // Reset champion tracking for new round
+        currentChampion: restedChampion,
+        championBeatenOpponents: []
       };
       await syncGameStateToRoom(newGameState);
     }
 
-    showStatus(`😴 ${streakWinner.name} 選擇休息並獲得1分，繼續參與比賽`, 'info');
+    showStatus(`😴 ${streakWinner.name} 選擇休息並獲得1分，開始新一輪挑戰`, 'info');
   };
 
-  // Helper function to find next opponent
+  // Helper function to find next opponent in rotation
   const findNextOpponent = (playerList, currentPlayer) => {
     const currentPosition = currentPlayer.position;
     for (let i = 1; i < playerList.length; i++) {
@@ -449,25 +512,29 @@ function App() {
     return null;
   };
 
-  // Handle continue playing - anyone can use now
+  // Handle continue playing - champion continues current round
   const handleContinuePlay = async () => {
     if (!streakWinner) return;
     
-    const winner = streakWinner;
+    const champion = streakWinner;
     setStreakWinner(null);
     setShowRestOption(false);
     
-    // Continue with current match setup or find next opponent
-    const nextChallenger = findNextOpponent(players, winner);
+    // Reset for new round but keep champion
+    setCurrentChampion(champion);
+    setChampionBeatenOpponents([]);
+    
+    // Find next challenger for new round
+    const nextChallenger = findNextOpponent(players, champion);
     if (nextChallenger) {
-      setCurrentFighters([winner, nextChallenger]);
+      setCurrentFighters([champion, nextChallenger]);
     }
     
     // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
       const newGameState = {
         players,
-        currentFighters: [winner, nextChallenger],
+        currentFighters: [champion, nextChallenger],
         battleCount,
         gameHistory,
         gameStarted: true,
@@ -476,15 +543,18 @@ function App() {
         playerNames,
         // Reset rest option state in sync
         showRestOption: false,
-        streakWinner: null
+        streakWinner: null,
+        // Reset champion tracking for new round
+        currentChampion: champion,
+        championBeatenOpponents: []
       };
       await syncGameStateToRoom(newGameState);
     }
     
-    showStatus(`💪 ${winner?.name} 選擇繼續比賽！`, 'success');
+    showStatus(`💪 ${champion?.name} 選擇繼續比賽，開始新一輪挑戰！`, 'success');
   };
 
-  // Undo last action - anyone can use now
+  // Undo last action
   const handleUndo = () => {
     if (undoStack.length === 0) return;
 
@@ -495,12 +565,14 @@ function App() {
     setGameHistory(lastState.gameHistory);
     setShowRestOption(lastState.showRestOption);
     setStreakWinner(lastState.streakWinner);
+    setCurrentChampion(lastState.currentChampion);
+    setChampionBeatenOpponents(lastState.championBeatenOpponents);
     setUndoStack(prev => prev.slice(0, -1));
 
     showStatus('↶ 已撤銷上一步操作', 'info');
   };
 
-  // End game - anyone can use now
+  // End game
   const endGame = async () => {
     setGameEnded(true);
     setGameStarted(false);
@@ -534,6 +606,8 @@ function App() {
     setGameHistory([]);
     setGameEnded(false);
     setUndoStack([]);
+    setCurrentChampion(null);
+    setChampionBeatenOpponents([]);
     
     // Clear room state
     if (roomId) {
@@ -562,7 +636,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.4.6</div>
+        <div className="version">v1.4.7</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -572,7 +646,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.4.6</div>
+        <div className="version">v1.4.7</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -587,7 +661,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.4.6</div>
+        <div className="version">v1.4.7</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -597,7 +671,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.4.6
+        v1.4.7
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
