@@ -338,6 +338,34 @@ function App() {
     }
   };
 
+  // Helper function to setup match between two other players (excluding rested champion)
+  const setupMatchBetweenOthers = (playerList, excludedPlayerId = null) => {
+    console.log('Setting up match between other players, excluding:', excludedPlayerId);
+    
+    // Find available players (excluding the rested champion if provided)
+    const availablePlayers = playerList.filter(player => 
+      excludedPlayerId ? player.id !== excludedPlayerId : true
+    );
+    
+    if (availablePlayers.length < 2) {
+      console.log('Not enough players for a match');
+      return null;
+    }
+
+    // Sort by position and take first two
+    const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
+    const newFighters = [sortedAvailable[0], sortedAvailable[1]];
+    
+    console.log('New match setup between:', newFighters.map(p => p.name));
+    
+    // Set new champion tracking - first player becomes new champion
+    setCurrentChampion(newFighters[0]);
+    setChampionBeatenOpponents([]);
+    
+    setCurrentFighters(newFighters);
+    return newFighters;
+  };
+
   // Enhanced declare winner function with proper tournament rotation logic
   const declareWinner = async (winnerIndex) => {
     if (!currentFighters[0] || !currentFighters[1] || gameEnded) return;
@@ -471,11 +499,11 @@ function App() {
     showStatus(`🎉 ${winner.name} 獲勝！`, 'success');
   };
 
-  // Handle rest option - champion gets bonus point and resets for new round
+  // Handle rest option - champion gets bonus point and steps down, others play
   const handleTakeRest = async () => {
     if (!streakWinner) return;
 
-    // Give the champion 1 additional point and reset the round
+    // Give the champion 1 additional point
     const updatedPlayers = players.map(player => {
       if (player.id === streakWinner.id) {
         return { 
@@ -491,19 +519,11 @@ function App() {
     setStreakWinner(null);
     setShowRestOption(false);
     
-    // Reset champion tracking for new round - champion can continue or step down
-    setCurrentChampion(updatedPlayers.find(p => p.id === streakWinner.id));
-    setChampionBeatenOpponents([]);
+    // ✅ 修改邏輯：休息後擂主下場，讓其他人開始新的比賽
+    const restedChampionId = streakWinner.id;
+    const newCurrentFighters = setupMatchBetweenOthers(updatedPlayers, restedChampionId);
     
-    // Find next challenger for the rested champion to start new round
-    const restedChampion = updatedPlayers.find(p => p.id === streakWinner.id);
-    const nextChallenger = findNextOpponent(updatedPlayers, restedChampion);
-    
-    let newCurrentFighters = [restedChampion, nextChallenger];
-    
-    if (nextChallenger) {
-      setCurrentFighters(newCurrentFighters);
-    } else {
+    if (!newCurrentFighters) {
       endGame();
       return;
     }
@@ -522,14 +542,14 @@ function App() {
         // Reset rest option state in sync
         showRestOption: false,
         streakWinner: null,
-        // Reset champion tracking for new round
-        currentChampion: restedChampion,
+        // Update champion tracking - new champion is first fighter
+        currentChampion: newCurrentFighters[0],
         championBeatenOpponents: []
       };
       await syncGameStateToRoom(newGameState);
     }
 
-    showStatus(`😴 ${streakWinner.name} 選擇休息並獲得1分，開始新一輪挑戰`, 'info');
+    showStatus(`😴 ${streakWinner.name} 選擇休息並獲得1分，下場休息，其他人開始比賽`, 'info');
   };
 
   // Helper function to find next opponent in rotation
@@ -671,7 +691,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.4.8</div>
+        <div className="version">v1.4.9</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -681,7 +701,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.4.8</div>
+        <div className="version">v1.4.9</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -696,7 +716,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.4.8</div>
+        <div className="version">v1.4.9</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -706,7 +726,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.4.8
+        v1.4.9
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
