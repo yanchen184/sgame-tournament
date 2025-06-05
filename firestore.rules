@@ -1,0 +1,57 @@
+// Firebase Firestore 安全規則建議
+// 請將此規則複製到 Firebase 控制台的 Firestore 安全規則中
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 房間 (rooms) 集合 - 允許讀取和寫入
+    match /rooms/{roomId} {
+      // 允許所有人讀取房間資訊 (用於房間瀏覽和歷史記錄)
+      allow read: if true;
+      
+      // 允許創建新房間
+      allow create: if true;
+      
+      // 允許更新房間狀態 (房主或參與者)
+      allow update: if true;
+      
+      // 不允許刪除房間 (保護歷史資料)
+      allow delete: if false;
+    }
+    
+    // 遊戲 (games) 集合 - 單人模式
+    match /games/{gameId} {
+      allow read, write: if true;
+    }
+    
+    // 選手 (players) 集合
+    match /players/{playerId} {
+      allow read, write: if true;
+    }
+    
+    // 比賽記錄 (matches) 集合
+    match /matches/{matchId} {
+      allow read, write: if true;
+    }
+    
+    // 預設拒絕其他所有存取
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+/*
+注意事項：
+1. 此規則允許所有人讀寫資料，適合開發和測試環境
+2. 在生產環境中，建議加入適當的身份驗證和權限控制
+3. 可以根據需要調整權限，例如只允許房主更新房間狀態
+4. 建議保護已完成的比賽記錄，防止被意外刪除
+
+生產環境安全規則建議：
+- 加入 auth != null 檢查
+- 限制寫入權限給特定用戶
+- 加入資料驗證規則
+- 設定寫入頻率限制
+*/
