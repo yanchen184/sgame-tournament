@@ -21,22 +21,20 @@ const shuffleArray = (array) => {
   return newArray;
 };
 
-// Default player names (randomized each time) - expanded for up to 8 players
+// Default player names - fixed order for 4 players as requested
 const getDefaultPlayerNames = (count = 4) => {
   const baseNames = ['bob', 'jimmy', 'white', 'dada', 'alex', 'sam', 'chris', 'taylor'];
-  const shuffledNames = shuffleArray(baseNames);
-  return shuffledNames.slice(0, count);
+  return baseNames.slice(0, count);
 };
 
-// Initial player data template - now supports dynamic player count
+// Initial player data template - now supports dynamic player count, removed resting flag
 const createInitialPlayers = (names = getDefaultPlayerNames(), playerCount = 4) => {
   return names.slice(0, playerCount).map((name, index) => ({
     id: index + 1,
     name: name || `Player${index + 1}`,
     score: 0,
     winStreak: 0,
-    position: index,
-    resting: false
+    position: index
   }));
 };
 
@@ -234,14 +232,14 @@ function App() {
 
   // Setup initial match or next available match
   const setupInitialMatch = (playerList = players) => {
-    const availablePlayers = playerList.filter(p => !p.resting);
+    const availablePlayers = playerList.filter(p => p); // Remove resting filter since we removed resting flag
     if (availablePlayers.length >= 2) {
       const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
       setCurrentFighters([sortedAvailable[0], sortedAvailable[1]]);
     }
   };
 
-  // Declare winner function - THIS WAS MISSING!
+  // Declare winner function
   const declareWinner = async (winnerIndex) => {
     if (!currentFighters[0] || !currentFighters[1] || gameEnded) return;
 
@@ -291,18 +289,18 @@ function App() {
     };
     setGameHistory(prev => [...prev, matchResult]);
 
-    // Check for win streak
+    // Check for win streak - New simplified rest rule
     const updatedWinner = updatedPlayers.find(p => p.id === winner.id);
     if (updatedWinner.winStreak >= 3) {
       setStreakWinner(updatedWinner);
       setShowRestOption(true);
-      showStatus(`🔥 ${winner.name} 三連勝！可以選擇休息或繼續`, 'warning', true);
+      showStatus(`🔥 ${winner.name} 三連勝！可以選擇休息獲得1分或繼續比賽`, 'warning', true);
     } else {
       setupNextMatch(updatedPlayers, loser);
     }
 
     // Sync to Firebase if in multiplayer mode
-    if (isMultiplayer && isRoomHost) {
+    if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
         currentFighters,
@@ -321,7 +319,7 @@ function App() {
 
   // Setup next match
   const setupNextMatch = (playerList, lastLoser) => {
-    const availablePlayers = playerList.filter(p => !p.resting);
+    const availablePlayers = playerList; // All players are available since we removed resting
     
     if (availablePlayers.length < 2) {
       endGame();
@@ -335,7 +333,7 @@ function App() {
     // Look for next available player in queue order
     for (let i = 1; i <= playerList.length; i++) {
       const nextPosition = (loserPosition + i) % playerList.length;
-      const candidate = playerList.find(p => p.position === nextPosition && !p.resting);
+      const candidate = playerList.find(p => p.position === nextPosition);
       if (candidate && !currentFighters.some(f => f && f.id === candidate.id)) {
         nextChallenger = candidate;
         break;
@@ -350,13 +348,18 @@ function App() {
     }
   };
 
-  // Handle rest option
+  // Handle rest option - Modified to give 1 point and continue in rotation
   const handleTakeRest = async () => {
     if (!streakWinner) return;
 
+    // Give the streak winner 1 additional point but keep them in rotation
     const updatedPlayers = players.map(player => {
       if (player.id === streakWinner.id) {
-        return { ...player, resting: true, score: player.score + 1 };
+        return { 
+          ...player, 
+          score: player.score + 1,
+          winStreak: 0 // Reset streak after taking rest
+        };
       }
       return player;
     });
@@ -365,22 +368,60 @@ function App() {
     setStreakWinner(null);
     setShowRestOption(false);
     
-    // Setup next match without the resting player
-    const availablePlayers = updatedPlayers.filter(p => !p.resting);
-    if (availablePlayers.length >= 2) {
-      setCurrentFighters([availablePlayers[0], availablePlayers[1]]);
+    // Continue normal rotation - find next opponent for the streak winner
+    const restWinner = updatedPlayers.find(p => p.id === streakWinner.id);
+    const nextChallenger = findNextOpponent(updatedPlayers, restWinner);
+    
+    if (nextChallenger) {
+      setCurrentFighters([restWinner, nextChallenger]);
     } else {
       endGame();
     }
 
-    showStatus(`😴 ${streakWinner.name} 選擇休息並獲得1分`, 'info');
+    // Sync to Firebase if in multiplayer mode
+    if (isMultiplayer) {
+      const newGameState = {
+        players: updatedPlayers,
+        currentFighters: [restWinner, nextChallenger],
+        battleCount,
+        gameHistory,
+        gameStarted: true,
+        gameEnded: false,
+        playerCount,
+        playerNames
+      };
+      await updateRoomGameState(newGameState);
+    }
+
+    showStatus(`😴 ${streakWinner.name} 選擇休息並獲得1分，繼續參與比賽`, 'info');
+  };
+
+  // Helper function to find next opponent
+  const findNextOpponent = (playerList, currentPlayer) => {
+    const currentPosition = currentPlayer.position;
+    for (let i = 1; i < playerList.length; i++) {
+      const nextPosition = (currentPosition + i) % playerList.length;
+      const candidate = playerList.find(p => p.position === nextPosition);
+      if (candidate && candidate.id !== currentPlayer.id) {
+        return candidate;
+      }
+    }
+    return null;
   };
 
   // Handle continue playing
   const handleContinuePlay = () => {
+    const winner = streakWinner;
     setStreakWinner(null);
     setShowRestOption(false);
-    showStatus(`💪 ${streakWinner?.name} 選擇繼續比賽！`, 'success');
+    
+    // Continue with current match setup or find next opponent
+    const nextChallenger = findNextOpponent(players, winner);
+    if (nextChallenger) {
+      setCurrentFighters([winner, nextChallenger]);
+    }
+    
+    showStatus(`💪 ${winner?.name} 選擇繼續比賽！`, 'success');
   };
 
   // Undo last action
@@ -411,11 +452,35 @@ function App() {
       endTime: new Date()
     };
 
-    if (isMultiplayer && isRoomHost) {
+    if (isMultiplayer) {
       await endRoom(finalResults);
     }
 
     showStatus('🏁 比賽結束！查看最終排名', 'success', true);
+  };
+
+  // Return to room browser
+  const returnToRoomBrowser = () => {
+    // Reset all game state
+    setAppMode('room-browser');
+    setIsMultiplayer(false);
+    setGameSetup(false);
+    setPlayers([]);
+    setCurrentFighters([null, null]);
+    setGameStarted(false);
+    setBattleCount(0);
+    setShowRestOption(false);
+    setStreakWinner(null);
+    setGameHistory([]);
+    setGameEnded(false);
+    setUndoStack([]);
+    
+    // Clear room state
+    if (roomId) {
+      leaveRoom();
+    }
+    
+    showStatus('🏠 已返回房間選擇', 'info');
   };
 
   // Show status message
@@ -437,7 +502,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.4.1</div>
+        <div className="version">v1.4.2</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -451,7 +516,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.4.1</div>
+        <div className="version">v1.4.2</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -461,7 +526,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.4.1
+        v1.4.2
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
@@ -500,7 +565,7 @@ function App() {
               gameEnded={gameEnded}
               showRestOption={showRestOption}
               hasUndoActions={undoStack.length > 0}
-              isRoomHost={isRoomHost}
+              isRoomHost={true} // Changed: Everyone can control now
               isMultiplayer={isMultiplayer}
               onStartGame={() => {}}
               onDeclareWinner={declareWinner}
@@ -508,7 +573,7 @@ function App() {
               onContinuePlay={handleContinuePlay}
               onUndoAction={handleUndo}
               onEndGame={endGame}
-              onResetGame={() => setAppMode('room-browser')}
+              onResetGame={returnToRoomBrowser} // Changed: Return to room browser
               onToggleHistory={() => setShowHistory(!showHistory)}
               showHistory={showHistory}
               layout="mobile"
