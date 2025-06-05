@@ -49,7 +49,7 @@ const GameControls = ({
       {showRestOption && !gameEnded && (
         <div className="rest-options">
           <button className="btn rest-btn" onClick={onTakeRest}>
-            😴 加1分下場
+            😴 休息得1分
           </button>
           
           <button className="btn continue-btn" onClick={onContinuePlay}>
@@ -86,9 +86,9 @@ const GameControls = ({
           </button>
         )}
         
-        {/* Reset button - always available */}
+        {/* Return to room browser button - changed text */}
         <button className="btn danger-btn" onClick={onResetGame}>
-          🔄 重置比賽
+          🏠 回到房間選擇
         </button>
       </div>
     </div>
