@@ -9,6 +9,7 @@ import GameRules from './components/GameRules';
 import GameHistory from './components/GameHistory';
 import PlayerSetup from './components/PlayerSetup';
 import RoomBrowser from './components/RoomBrowser';
+import RoomHistory from './components/RoomHistory';
 import { useFirebaseGame, useFirebaseRoom, useRealtimeRoom } from './hooks/useFirebaseGame';
 
 // Shuffle array utility function (moved to top for use in initial players)
@@ -39,7 +40,7 @@ const createInitialPlayers = (names = getDefaultPlayerNames(), playerCount = 4) 
 };
 
 function App() {
-  // App mode: 'room-browser', 'player-setup', 'game'
+  // App mode: 'room-browser', 'player-setup', 'game', 'history'
   const [appMode, setAppMode] = useState('room-browser');
   
   // Room state
@@ -178,6 +179,11 @@ function App() {
     }
   };
 
+  // Handle view history
+  const handleViewHistory = () => {
+    setAppMode('history');
+  };
+
   // Setup players with custom names and player count
   const setupPlayers = async (names, count = 4) => {
     setPlayerCount(count);
@@ -232,7 +238,7 @@ function App() {
 
   // Setup initial match or next available match
   const setupInitialMatch = (playerList = players) => {
-    const availablePlayers = playerList.filter(p => p); // Remove resting filter since we removed resting flag
+    const availablePlayers = playerList.filter(p => p);
     if (availablePlayers.length >= 2) {
       const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
       setCurrentFighters([sortedAvailable[0], sortedAvailable[1]]);
@@ -319,7 +325,7 @@ function App() {
 
   // Setup next match
   const setupNextMatch = (playerList, lastLoser) => {
-    const availablePlayers = playerList; // All players are available since we removed resting
+    const availablePlayers = playerList;
     
     if (availablePlayers.length < 2) {
       endGame();
@@ -498,14 +504,25 @@ function App() {
     setStatusMessage(null);
   };
 
+  // Show room history view
+  if (appMode === 'history') {
+    return (
+      <div className="App">
+        <div className="version">v1.4.3</div>
+        <RoomHistory onBack={() => setAppMode('room-browser')} />
+      </div>
+    );
+  }
+
   // Show room browser if not in game mode
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.4.2</div>
+        <div className="version">v1.4.3</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
+          onViewHistory={handleViewHistory}
           isLoading={isJoiningRoom}
         />
       </div>
@@ -516,7 +533,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.4.2</div>
+        <div className="version">v1.4.3</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -526,7 +543,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.4.2
+        v1.4.3
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
