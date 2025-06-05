@@ -18,7 +18,7 @@ const GameArena = ({ currentFighters, showRestOption, streakWinner }) => {
       {showRestOption && (
         <div className="rest-option">
           <strong>🏆 連勝 3 場！</strong><br />
-          {streakWinner?.name} 可選擇休息並額外得 1 分，或繼續比賽
+          {streakWinner?.name} 可選擇休息得 1 分並繼續參與，或直接繼續比賽
         </div>
       )}
     </div>
