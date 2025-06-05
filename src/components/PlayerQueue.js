@@ -2,10 +2,9 @@ import React from 'react';
 import './PlayerQueue.css';
 
 const PlayerQueue = ({ players, currentFighters, layout = 'desktop' }) => {
-  // Get players in queue (not fighting and not resting)
+  // Get players in queue (not fighting) - removed resting filter
   const queuePlayers = players
     .filter(player => 
-      !player.resting && 
       !currentFighters.some(fighter => fighter && fighter.id === player.id)
     )
     .sort((a, b) => a.position - b.position);
