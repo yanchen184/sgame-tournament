@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './RoomBrowser.css';
 import { useFirebaseRoom } from '../hooks/useFirebaseGame';
 
-const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
+const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => {
   const [activeRooms, setActiveRooms] = useState([]);
   const [roomCode, setRoomCode] = useState('');
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
@@ -247,14 +247,20 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
     <div className="room-browser">
       <div className="room-browser-header">
         <h2>🏠 多人房間</h2>
-        <div className="header-status">
+        <div className="header-actions">
           <span className="live-indicator">🔴 即時更新</span>
+          <button 
+            className="history-btn"
+            onClick={onViewHistory}
+          >
+            📈 歷史統計
+          </button>
           <button 
             className="refresh-btn"
             onClick={loadActiveRooms}
             disabled={isLoadingRooms}
           >
-            {isLoadingRooms ? '⟳' : '🔄'} 手動刷新
+            {isLoadingRooms ? '⟳' : '🔄'} 刷新
           </button>
         </div>
       </div>
@@ -367,6 +373,13 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
             </div>
           </div>
           <div className="tip-item">
+            <span className="tip-icon">📈</span>
+            <div>
+              <strong>歷史統計</strong>
+              <p>查看過往比賽記錄和選手表現</p>
+            </div>
+          </div>
+          <div className="tip-item">
             <span className="tip-icon">🎮</span>
             <div>
               <strong>房主模式</strong>
@@ -378,13 +391,6 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
             <div>
               <strong>觀戰模式</strong>
               <p>加入他人房間，即時觀看比賽進度</p>
-            </div>
-          </div>
-          <div className="tip-item">
-            <span className="tip-icon">📱</span>
-            <div>
-              <strong>手機友好</strong>
-              <p>支援多設備同時觀看同一場比賽</p>
             </div>
           </div>
         </div>
