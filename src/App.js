@@ -592,7 +592,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.4.4</div>
+        <div className="version">v1.4.5</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -602,7 +602,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.4.4</div>
+        <div className="version">v1.4.5</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -617,7 +617,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.4.4</div>
+        <div className="version">v1.4.5</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -627,7 +627,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.4.4
+        v1.4.5
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
