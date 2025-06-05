@@ -184,6 +184,105 @@ class GameService {
   }
 
   /**
+   * Get list of completed rooms for history
+   * @param {number} limitCount - Number of rooms to retrieve
+   * @returns {Promise<Array>} - Array of completed rooms
+   */
+  async getCompletedRooms(limitCount = 50) {
+    try {
+      console.log('Getting completed rooms for history');
+      
+      const roomsRef = collection(db, COLLECTIONS.ROOMS);
+      const q = query(
+        roomsRef,
+        where('status', '==', 'completed'),
+        orderBy('endedAt', 'desc'),
+        limit(limitCount)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const rooms = [];
+      
+      querySnapshot.forEach((doc) => {
+        const roomData = { id: doc.id, ...doc.data() };
+        rooms.push({
+          id: roomData.id,
+          roomCode: roomData.roomCode,
+          playerCount: roomData.playerCount || 4,
+          playerNames: roomData.playerNames || [],
+          finalResults: roomData.finalResults,
+          created: roomData.createdAt?.toDate() || new Date(),
+          ended: roomData.endedAt?.toDate() || new Date(),
+          duration: roomData.endedAt && roomData.createdAt 
+            ? roomData.endedAt.toDate() - roomData.createdAt.toDate()
+            : 0,
+          totalBattles: roomData.finalResults?.totalBattles || 0
+        });
+      });
+      
+      console.log('Found completed rooms:', rooms.length);
+      return rooms;
+    } catch (error) {
+      console.error('Error getting completed rooms:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Subscribe to real-time active rooms updates
+   * @param {Function} callback - Callback function for updates
+   * @param {Function} errorCallback - Error callback function
+   * @param {number} limitCount - Number of rooms to retrieve
+   * @returns {Function} - Unsubscribe function
+   */
+  subscribeToActiveRooms(callback, errorCallback, limitCount = 20) {
+    try {
+      console.log('Subscribing to active rooms updates');
+      
+      const roomsRef = collection(db, COLLECTIONS.ROOMS);
+      const q = query(
+        roomsRef,
+        where('status', '==', 'active'),
+        orderBy('lastActivity', 'desc'),
+        limit(limitCount)
+      );
+      
+      return onSnapshot(q, 
+        (querySnapshot) => {
+          console.log('Active rooms update received');
+          const rooms = [];
+          
+          querySnapshot.forEach((doc) => {
+            const roomData = { id: doc.id, ...doc.data() };
+            rooms.push({
+              id: roomData.id,
+              displayName: roomData.roomCode,
+              roomCode: roomData.roomCode,
+              playerCount: roomData.playerCount || 4,
+              currentPlayers: roomData.playerNames || [],
+              status: 'playing',
+              created: roomData.createdAt?.toDate() || new Date(),
+              lastActivity: roomData.lastActivity?.toDate() || new Date()
+            });
+          });
+          
+          console.log('Real-time active rooms count:', rooms.length);
+          callback(rooms);
+        },
+        (error) => {
+          console.error('Error in active rooms subscription:', error);
+          if (errorCallback) {
+            errorCallback(error);
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error subscribing to active rooms:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update room game state
    * @param {string} roomId - Room ID
    * @param {Object} gameState - Game state data
