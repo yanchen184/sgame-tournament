@@ -1,0 +1,637 @@
+/* Room History Styles */
+.room-history {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.room-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.room-history-header h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+.back-btn,
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover,
+.refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Error Message */
+.error-message {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fef2f2;
+  text-align: center;
+}
+
+.error-message small {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.8;
+  font-size: 0.8rem;
+}
+
+/* Global Stats Section */
+.global-stats {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 24px;
+  border-radius: 16px;
+  margin-bottom: 30px;
+  backdrop-filter: blur(10px);
+}
+
+.global-stats h3 {
+  margin: 0 0 20px 0;
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #4facfe;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* Player Stats */
+.player-stats {
+  margin-top: 24px;
+}
+
+.player-stats h4 {
+  margin: 0 0 16px 0;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.player-stats-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.player-stat-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.player-stat-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.player-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.player-stat-name {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.player-stat-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.win-badge {
+  background: #4ade80;
+  color: #065f46;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.games-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.player-stat-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+/* Completed Rooms Section */
+.completed-rooms-section {
+  margin-bottom: 30px;
+}
+
+.completed-rooms-section h3 {
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.empty-state {
+  padding: 60px 20px;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.empty-state h4 {
+  margin: 0 0 10px 0;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Completed Rooms Grid */
+.completed-rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.completed-room-card {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 24px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.completed-room-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.room-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 15px;
+}
+
+.room-card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: bold;
+  flex: 1;
+}
+
+.room-card-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.player-count-badge,
+.battles-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.player-count-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.battles-badge {
+  background: #4ade80;
+  color: #065f46;
+}
+
+.room-card-winner {
+  background: rgba(255, 215, 0, 0.2);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.winner-label {
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+.winner-name {
+  font-weight: bold;
+  color: #ffd700;
+}
+
+.winner-score {
+  opacity: 0.9;
+}
+
+.room-card-info {
+  margin-bottom: 16px;
+}
+
+.room-card-detail {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 10px;
+}
+
+.detail-label {
+  font-weight: bold;
+  opacity: 0.9;
+  min-width: 60px;
+}
+
+.detail-value {
+  text-align: right;
+  flex: 1;
+}
+
+.view-details-hint {
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.7;
+  font-style: italic;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Room Details View */
+.room-details {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 24px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.room-detail-header {
+  margin-bottom: 24px;
+}
+
+.room-detail-header h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.6rem;
+  font-weight: bold;
+}
+
+.room-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detail-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.final-rankings {
+  margin-bottom: 24px;
+}
+
+.final-rankings h4 {
+  margin: 0 0 16px 0;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.rankings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border-radius: 12px;
+  gap: 16px;
+}
+
+.ranking-item.winner {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 193, 7, 0.2));
+  border: 2px solid rgba(255, 215, 0, 0.5);
+}
+
+.rank-number {
+  font-size: 1.5rem;
+  font-weight: bold;
+  min-width: 40px;
+  text-align: center;
+}
+
+.player-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.player-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.player-score {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #4facfe;
+}
+
+.winner-badge {
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #92400e;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.match-info h4 {
+  margin: 0 0 16px 0;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.info-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
+  font-weight: bold;
+  opacity: 0.9;
+}
+
+.info-value {
+  font-weight: bold;
+  color: #4facfe;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .room-history {
+    padding: 15px;
+  }
+
+  .room-history-header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+
+  .room-history-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .stat-number {
+    font-size: 1.5rem;
+  }
+
+  .completed-rooms-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .completed-room-card {
+    padding: 20px;
+  }
+
+  .room-card-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .room-card-badges {
+    flex-direction: row;
+    align-items: center;
+    align-self: stretch;
+    justify-content: space-between;
+  }
+
+  .room-card-detail {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-value {
+    text-align: left;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .info-item {
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .player-stats-list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .player-stat-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .rankings-list {
+    gap: 10px;
+  }
+
+  .ranking-item {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .player-info {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  .rank-number {
+    font-size: 1.2rem;
+    min-width: 30px;
+  }
+
+  .room-detail-header h3 {
+    font-size: 1.4rem;
+  }
+
+  .detail-badge {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+  }
+
+  .global-stats {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .room-history {
+    padding: 10px;
+  }
+
+  .room-history-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .completed-room-card {
+    padding: 16px;
+  }
+
+  .room-card-title {
+    font-size: 1.1rem;
+  }
+
+  .global-stats {
+    padding: 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-number {
+    font-size: 1.3rem;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+  }
+}
