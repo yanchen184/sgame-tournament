@@ -296,47 +296,31 @@ function App() {
     }
   };
 
-  // Setup next match for champion
-  const setupNextMatch = (playerList, champion, beatenOpponents) => {
-    console.log('Setting up next match for champion:', champion.name);
-    console.log('Already beaten opponents:', beatenOpponents.map(p => p.name));
+  // Find next challenger for current champion - winner stays, loser gets replaced
+  const findNextChallenger = (playerList, currentWinner, currentLoser) => {
+    console.log(`Finding next challenger. Winner: ${currentWinner.name}, Loser: ${currentLoser.name}`);
     
-    const availableChallengers = playerList.filter(player => 
-      player.id !== champion.id && 
-      !beatenOpponents.some(beaten => beaten.id === player.id)
-    );
+    // Get the position after the loser's position to find the next challenger
+    const loserPosition = currentLoser.position;
+    const totalPlayers = playerList.length;
     
-    console.log('Available challengers:', availableChallengers.map(p => p.name));
-    
-    if (availableChallengers.length === 0) {
-      console.log('No available challengers, ending game');
-      return null;
-    }
-
-    const championPosition = champion.position;
-    let nextChallenger = null;
-    
-    for (let i = 1; i < playerList.length; i++) {
-      const nextPosition = (championPosition + i) % playerList.length;
+    // Find the next player in rotation after the loser
+    for (let i = 1; i < totalPlayers; i++) {
+      const nextPosition = (loserPosition + i) % totalPlayers;
       const candidate = playerList.find(p => p.position === nextPosition);
-      if (candidate && availableChallengers.some(ac => ac.id === candidate.id)) {
-        nextChallenger = candidate;
-        break;
+      
+      // Make sure the candidate is not the current winner
+      if (candidate && candidate.id !== currentWinner.id) {
+        console.log(`Next challenger found: ${candidate.name}`);
+        return candidate;
       }
     }
-
-    console.log('Next challenger found:', nextChallenger?.name || 'none');
     
-    if (nextChallenger) {
-      const newFighters = [champion, nextChallenger];
-      setCurrentFighters(newFighters);
-      return newFighters;
-    } else {
-      return null;
-    }
+    console.log('No next challenger found');
+    return null;
   };
 
-  // Setup match between other players
+  // Setup match between other players (when winner takes rest)
   const setupMatchBetweenOthers = (playerList, excludedPlayerId = null) => {
     console.log('Setting up match between other players, excluding:', excludedPlayerId);
     
@@ -373,7 +357,7 @@ function App() {
       return;
     }
 
-    console.log(`Winner: ${winner.name}, Loser: ${loser.name}`);
+    console.log(`🏆 Winner: ${winner.name}, 💔 Loser: ${loser.name}`);
 
     // Save current state to undo stack
     const currentState = {
@@ -420,57 +404,42 @@ function App() {
     };
     setGameHistory(prev => [...prev, matchResult]);
 
-    // Update champion tracking
-    let newChampion = currentChampion;
-    let newBeatenOpponents = [...championBeatenOpponents];
-    let shouldShowRest = false;
-    let newCurrentFighters = currentFighters;
-
-    if (winner.id === currentChampion?.id) {
-      // Current champion wins
-      if (!newBeatenOpponents.some(op => op.id === loser.id)) {
-        newBeatenOpponents.push(loser);
-      }
-      
-      console.log('Champion continues, beaten opponents now:', newBeatenOpponents.map(p => p.name));
-      
-      // Check if champion has beaten all other players
+    // 🎯 WINNER STAYS LOGIC: Winner remains, find next challenger to replace loser
+    const nextChallenger = findNextChallenger(updatedPlayers, winner, loser);
+    
+    if (!nextChallenger) {
+      // If no next challenger, check if winner completed a round
       const otherPlayers = updatedPlayers.filter(p => p.id !== winner.id);
       const hasBeatenAll = otherPlayers.every(player => 
-        newBeatenOpponents.some(beaten => beaten.id === player.id)
+        championBeatenOpponents.some(beaten => beaten.id === player.id) || player.id === loser.id
       );
       
-      console.log('Has beaten all players in this round:', hasBeatenAll);
-      
       if (hasBeatenAll) {
-        shouldShowRest = true;
+        // Winner completed a round - show rest option
         setStreakWinner(updatedPlayers.find(p => p.id === winner.id));
         setShowRestOption(true);
         showStatus(`🏆 ${winner.name} 完成一輪挑戰！可以選擇休息獲得1分或繼續比賽`, 'warning', true);
+        return;
       } else {
-        const nextFighters = setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
-        if (nextFighters) {
-          newCurrentFighters = nextFighters;
-        } else {
-          endGame();
-          return;
-        }
-      }
-    } else {
-      // Champion lost - new champion takes over
-      console.log('New champion takes over');
-      newChampion = updatedPlayers.find(p => p.id === winner.id);
-      newBeatenOpponents = [loser];
-      
-      const nextFighters = setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
-      if (nextFighters) {
-        newCurrentFighters = nextFighters;
-      } else {
+        // End game if truly no more challengers
         endGame();
         return;
       }
     }
 
+    // Set up next match: Winner stays, next challenger replaces loser
+    const newCurrentFighters = [winner, nextChallenger];
+    setCurrentFighters(newCurrentFighters);
+
+    // Update champion tracking
+    let newChampion = winner; // Winner becomes/remains champion
+    let newBeatenOpponents = [...championBeatenOpponents];
+    
+    // Add loser to beaten opponents if not already there
+    if (!newBeatenOpponents.some(op => op.id === loser.id)) {
+      newBeatenOpponents.push(loser);
+    }
+    
     setCurrentChampion(newChampion);
     setChampionBeatenOpponents(newBeatenOpponents);
 
@@ -485,15 +454,15 @@ function App() {
         gameEnded: false,
         playerCount,
         playerNames,
-        showRestOption: shouldShowRest,
-        streakWinner: shouldShowRest ? updatedPlayers.find(p => p.id === winner.id) : null,
+        showRestOption: false,
+        streakWinner: null,
         currentChampion: newChampion,
         championBeatenOpponents: newBeatenOpponents
       };
       await syncGameStateToRoom(newGameState);
     }
 
-    showStatus(`🎉 ${winner.name} 獲勝！`, 'success');
+    showStatus(`🎉 ${winner.name} 獲勝！${nextChallenger.name} 上場挑戰`, 'success');
   };
 
   // Legacy function for backwards compatibility
@@ -684,7 +653,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.5.0</div>
+        <div className="version">v1.5.1</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -694,7 +663,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.5.0</div>
+        <div className="version">v1.5.1</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -709,7 +678,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.5.0</div>
+        <div className="version">v1.5.1</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -719,7 +688,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.5.0
+        v1.5.1
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
