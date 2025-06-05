@@ -15,7 +15,7 @@ const Scoreboard = ({ players, currentFighters, layout = 'desktop' }) => {
           return (
             <div 
               key={player.id} 
-              className={`player ${isInArena ? 'in-arena' : ''} ${player.resting ? 'resting' : ''} ${index === 0 ? 'first-place' : ''}`}
+              className={`player ${isInArena ? 'in-arena' : ''} ${index === 0 ? 'first-place' : ''}`}
             >
               <div className="player-info">
                 <span className={`player-rank ${index === 0 ? 'rank-first' : ''}`}>
@@ -25,9 +25,6 @@ const Scoreboard = ({ players, currentFighters, layout = 'desktop' }) => {
                 <div className="player-badges">
                   {player.winStreak > 0 && (
                     <span className="win-streak">{player.winStreak} 連勝</span>
-                  )}
-                  {player.resting && (
-                    <span className="resting-badge">休息中</span>
                   )}
                   {isInArena && (
                     <span className="fighting-badge">比賽中</span>
