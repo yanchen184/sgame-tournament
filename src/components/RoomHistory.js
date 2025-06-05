@@ -7,106 +7,61 @@ const RoomHistory = ({ onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [isDemo, setIsDemo] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('checking');
 
   useEffect(() => {
     loadCompletedRooms();
   }, []);
 
-  // Mock data for demonstration
-  const getMockCompletedRooms = () => [
-    {
-      id: 'DEMO01',
-      roomCode: 'ABC123',
-      playerCount: 4,
-      playerNames: ['bob', 'jimmy', 'white', 'dada'],
-      finalResults: {
-        players: [
-          { name: 'bob', score: 8, winStreak: 0 },
-          { name: 'jimmy', score: 6, winStreak: 0 },
-          { name: 'white', score: 4, winStreak: 0 },
-          { name: 'dada', score: 2, winStreak: 0 }
-        ],
-        totalBattles: 20
-      },
-      created: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      ended: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-      duration: 60 * 60 * 1000, // 1 hour
-      totalBattles: 20
-    },
-    {
-      id: 'DEMO02',
-      roomCode: 'XYZ789',
-      playerCount: 3,
-      playerNames: ['alice', 'charlie', 'eve'],
-      finalResults: {
-        players: [
-          { name: 'alice', score: 12, winStreak: 0 },
-          { name: 'charlie', score: 8, winStreak: 0 },
-          { name: 'eve', score: 5, winStreak: 0 }
-        ],
-        totalBattles: 25
-      },
-      created: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      ended: new Date(Date.now() - 23 * 60 * 60 * 1000), // 23 hours ago
-      duration: 60 * 60 * 1000, // 1 hour
-      totalBattles: 25
-    },
-    {
-      id: 'DEMO03',
-      roomCode: 'DEF456',
-      playerCount: 4,
-      playerNames: ['tom', 'sarah', 'mike', 'lisa'],
-      finalResults: {
-        players: [
-          { name: 'sarah', score: 9, winStreak: 0 },
-          { name: 'tom', score: 7, winStreak: 0 },
-          { name: 'mike', score: 5, winStreak: 0 },
-          { name: 'lisa', score: 3, winStreak: 0 }
-        ],
-        totalBattles: 24
-      },
-      created: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-      ended: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000), // 3 days ago + 45 min
-      duration: 45 * 60 * 1000, // 45 minutes
-      totalBattles: 24
-    }
-  ];
-
   const loadCompletedRooms = async () => {
     setIsLoading(true);
     setError(null);
-    setIsDemo(false);
+    setConnectionStatus('connecting');
     
     try {
-      console.log('Attempting to load completed rooms from Firebase...');
+      console.log('🔍 正在從 Firebase 載入已完成的房間...');
       const rooms = await gameService.getCompletedRooms(50);
       
-      if (rooms && rooms.length > 0) {
-        console.log('Successfully loaded rooms from Firebase:', rooms.length);
+      console.log('✅ Firebase 查詢完成，找到房間數量:', rooms ? rooms.length : 0);
+      console.log('📊 返回的數據:', rooms);
+      
+      if (rooms && Array.isArray(rooms)) {
         setCompletedRooms(rooms);
-        setIsDemo(false);
+        setConnectionStatus('connected');
+        
+        if (rooms.length === 0) {
+          console.log('📭 Firebase 連接成功，但尚未有已完成的比賽記錄');
+        } else {
+          console.log('🎉 成功載入', rooms.length, '個已完成的比賽');
+        }
       } else {
-        console.log('No completed rooms found in Firebase, using demo data');
-        // If no rooms found, use demo data instead of showing error
-        setCompletedRooms(getMockCompletedRooms());
-        setIsDemo(true);
+        console.warn('⚠️ Firebase 返回了非預期的數據格式:', rooms);
+        setCompletedRooms([]);
+        setConnectionStatus('connected');
       }
+      
     } catch (err) {
-      console.error('Failed to load completed rooms from Firebase:', err);
-      console.log('Using demo data as fallback');
+      console.error('❌ 載入 Firebase 數據失敗:', err);
+      console.error('錯誤詳情:', {
+        code: err.code,
+        message: err.message,
+        name: err.name
+      });
       
-      // Use demo data as fallback
-      setCompletedRooms(getMockCompletedRooms());
-      setIsDemo(true);
+      setCompletedRooms([]);
+      setConnectionStatus('error');
       
-      // Set a friendly error message
+      // 提供具體的錯誤訊息
       if (err.code === 'permission-denied') {
-        setError('Firebase 權限不足，目前顯示演示資料');
+        setError('Firebase 權限被拒絕。請檢查 Firestore 安全規則設定。');
       } else if (err.code === 'unavailable') {
-        setError('Firebase 服務暫時無法使用，目前顯示演示資料');
+        setError('Firebase 服務暫時無法使用。請稍後再試。');
+      } else if (err.code === 'failed-precondition') {
+        setError('Firebase 索引未建立。請在 Firebase 控制台中建立必要的索引。');
+      } else if (err.message.includes('network')) {
+        setError('網路連接問題。請檢查網路連接並重試。');
       } else {
-        setError('無法連接到雲端資料庫，目前顯示演示資料');
+        setError(`Firebase 連接失敗: ${err.message || err.code || '未知錯誤'}`);
       }
     } finally {
       setIsLoading(false);
@@ -114,6 +69,8 @@ const RoomHistory = ({ onBack }) => {
   };
 
   const formatDuration = (durationMs) => {
+    if (!durationMs || durationMs <= 0) return '未知';
+    
     const minutes = Math.floor(durationMs / (1000 * 60));
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
@@ -125,8 +82,11 @@ const RoomHistory = ({ onBack }) => {
   };
 
   const formatTimeAgo = (date) => {
+    if (!date) return '未知時間';
+    
     const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+    const targetDate = date instanceof Date ? date : date.toDate ? date.toDate() : new Date(date);
+    const diffInMinutes = Math.floor((now - targetDate) / (1000 * 60));
     
     if (diffInMinutes < 1) return '剛剛';
     if (diffInMinutes < 60) return `${diffInMinutes}分鐘前`;
@@ -147,8 +107,8 @@ const RoomHistory = ({ onBack }) => {
     const totalGames = completedRooms.length;
     const totalBattles = completedRooms.reduce((sum, room) => sum + (room.totalBattles || 0), 0);
     const totalDuration = completedRooms.reduce((sum, room) => sum + (room.duration || 0), 0);
-    const avgBattlesPerGame = Math.round(totalBattles / totalGames);
-    const avgDuration = Math.round(totalDuration / totalGames);
+    const avgBattlesPerGame = totalBattles > 0 ? Math.round(totalBattles / totalGames) : 0;
+    const avgDuration = totalDuration > 0 ? Math.round(totalDuration / totalGames) : 0;
 
     // Player statistics
     const playerStats = {};
@@ -166,7 +126,7 @@ const RoomHistory = ({ onBack }) => {
             };
           }
           playerStats[player.name].gamesPlayed++;
-          playerStats[player.name].totalScore += player.score;
+          playerStats[player.name].totalScore += player.score || 0;
           playerStats[player.name].totalRank += (index + 1);
           if (index === 0) playerStats[player.name].wins++;
         });
@@ -175,8 +135,8 @@ const RoomHistory = ({ onBack }) => {
 
     // Calculate averages
     Object.values(playerStats).forEach(stats => {
-      stats.avgScore = Math.round((stats.totalScore / stats.gamesPlayed) * 10) / 10;
-      stats.avgRank = Math.round((stats.totalRank / stats.gamesPlayed) * 10) / 10;
+      stats.avgScore = stats.gamesPlayed > 0 ? Math.round((stats.totalScore / stats.gamesPlayed) * 10) / 10 : 0;
+      stats.avgRank = stats.gamesPlayed > 0 ? Math.round((stats.totalRank / stats.gamesPlayed) * 10) / 10 : 0;
     });
 
     return {
@@ -198,11 +158,6 @@ const RoomHistory = ({ onBack }) => {
             ← 返回列表
           </button>
           <h2>🏆 比賽詳情</h2>
-          {isDemo && (
-            <div className="demo-badge">
-              演示資料
-            </div>
-          )}
         </div>
 
         <div className="room-details">
@@ -225,7 +180,7 @@ const RoomHistory = ({ onBack }) => {
                   </div>
                   <div className="player-info">
                     <span className="player-name">{player.name}</span>
-                    <span className="player-score">{player.score} 分</span>
+                    <span className="player-score">{player.score || 0} 分</span>
                   </div>
                   {index === 0 && <div className="winner-badge">冠軍</div>}
                 </div>
@@ -238,11 +193,29 @@ const RoomHistory = ({ onBack }) => {
             <div className="info-grid">
               <div className="info-item">
                 <span className="info-label">開始時間:</span>
-                <span className="info-value">{selectedRoom.created.toLocaleString()}</span>
+                <span className="info-value">
+                  {selectedRoom.created ? 
+                    (selectedRoom.created instanceof Date ? 
+                      selectedRoom.created.toLocaleString() : 
+                      selectedRoom.created.toDate ? 
+                        selectedRoom.created.toDate().toLocaleString() : 
+                        new Date(selectedRoom.created).toLocaleString()
+                    ) : '未知'
+                  }
+                </span>
               </div>
               <div className="info-item">
                 <span className="info-label">結束時間:</span>
-                <span className="info-value">{selectedRoom.ended.toLocaleString()}</span>
+                <span className="info-value">
+                  {selectedRoom.ended ? 
+                    (selectedRoom.ended instanceof Date ? 
+                      selectedRoom.ended.toLocaleString() : 
+                      selectedRoom.ended.toDate ? 
+                        selectedRoom.ended.toDate().toLocaleString() : 
+                        new Date(selectedRoom.ended).toLocaleString()
+                    ) : '未知'
+                  }
+                </span>
               </div>
               <div className="info-item">
                 <span className="info-label">比賽時長:</span>
@@ -250,7 +223,7 @@ const RoomHistory = ({ onBack }) => {
               </div>
               <div className="info-item">
                 <span className="info-label">總對戰數:</span>
-                <span className="info-value">{selectedRoom.totalBattles}場</span>
+                <span className="info-value">{selectedRoom.totalBattles || 0}場</span>
               </div>
             </div>
           </div>
@@ -271,29 +244,33 @@ const RoomHistory = ({ onBack }) => {
         </button>
       </div>
 
-      {/* Demo mode indicator */}
-      {isDemo && (
-        <div className="demo-banner">
-          <div className="demo-content">
-            <span className="demo-icon">🎯</span>
-            <div className="demo-text">
-              <strong>演示模式</strong>
-              <span>目前顯示的是範例資料。完成真實比賽後會顯示實際的歷史記錄。</span>
-            </div>
+      {/* Connection Status */}
+      <div className="connection-status">
+        <div className={`status-indicator ${connectionStatus}`}>
+          {connectionStatus === 'checking' && '🔍 檢查連接...'}
+          {connectionStatus === 'connecting' && '🔗 連接 Firebase...'}
+          {connectionStatus === 'connected' && '✅ Firebase 已連接'}
+          {connectionStatus === 'error' && '❌ 連接失敗'}
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="error-message">
+          <div className="error-title">⚠️ 載入失敗</div>
+          <div className="error-detail">{error}</div>
+          <div className="error-actions">
+            <button onClick={loadCompletedRooms} className="retry-btn">
+              重試連接
+            </button>
           </div>
         </div>
       )}
 
-      {/* Only show error if it's not just demo mode */}
-      {error && !isDemo && (
-        <div className="error-message">
-          ⚠️ {error}
-        </div>
-      )}
-
-      {stats && (
+      {/* Stats - only show if we have data */}
+      {stats && completedRooms.length > 0 && (
         <div className="global-stats">
-          <h3>🌟 總體統計 {isDemo && <span className="demo-label">(演示)</span>}</h3>
+          <h3>🌟 總體統計</h3>
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-number">{stats.totalGames}</div>
@@ -350,24 +327,35 @@ const RoomHistory = ({ onBack }) => {
             <div className="loading-spinner"></div>
             <p>載入歷史記錄中...</p>
           </div>
+        ) : connectionStatus === 'error' ? (
+          <div className="error-state">
+            <div className="error-icon">🔌</div>
+            <h4>無法連接到 Firebase</h4>
+            <p>請檢查網路連接和 Firebase 設定</p>
+            <button onClick={loadCompletedRooms} className="retry-btn">
+              重試連接
+            </button>
+          </div>
         ) : completedRooms.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📭</div>
             <h4>還沒有完成的比賽</h4>
             <p>完成一些比賽後，這裡就會顯示歷史統計了</p>
+            <div className="empty-actions">
+              <button onClick={() => onBack()} className="start-game-btn">
+                開始新比賽
+              </button>
+            </div>
           </div>
         ) : (
           <div className="completed-rooms-grid">
             {completedRooms.map((room) => (
               <div key={room.id} className="completed-room-card" onClick={() => setSelectedRoom(room)}>
                 <div className="room-card-header">
-                  <h4 className="room-card-title">
-                    🏆 房間 {room.roomCode}
-                    {isDemo && <span className="demo-tag">演示</span>}
-                  </h4>
+                  <h4 className="room-card-title">🏆 房間 {room.roomCode}</h4>
                   <div className="room-card-badges">
-                    <span className="player-count-badge">{room.playerCount}人</span>
-                    <span className="battles-badge">{room.totalBattles}場</span>
+                    <span className="player-count-badge">{room.playerCount || 4}人</span>
+                    <span className="battles-badge">{room.totalBattles || 0}場</span>
                   </div>
                 </div>
                 
