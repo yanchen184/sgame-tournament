@@ -103,9 +103,9 @@ function App() {
     isLoading: roomDataLoading
   } = useRealtimeRoom(roomId, enableFirebase && isMultiplayer);
 
-  // Sync realtime data to local state (for guests) - Enhanced with better sync
+  // Sync realtime data to local state (for all users, not just guests)
   useEffect(() => {
-    if (isMultiplayer && !isRoomHost && realtimeGameData) {
+    if (isMultiplayer && realtimeGameData) {
       console.log('Syncing realtime game data:', realtimeGameData);
       
       // Sync all game state atomically to prevent UI inconsistencies
@@ -127,7 +127,7 @@ function App() {
       if (realtimeGameData.gameEnded !== undefined) {
         setGameEnded(realtimeGameData.gameEnded);
       }
-      // Fix: Sync rest option and streak winner state
+      // Sync rest option and streak winner state
       if (realtimeGameData.showRestOption !== undefined) {
         setShowRestOption(realtimeGameData.showRestOption);
       }
@@ -135,7 +135,7 @@ function App() {
         setStreakWinner(realtimeGameData.streakWinner);
       }
     }
-  }, [realtimeGameData, isMultiplayer, isRoomHost]);
+  }, [realtimeGameData, isMultiplayer]);
 
   // Handle room creation
   const handleCreateRoom = async () => {
@@ -170,7 +170,7 @@ function App() {
         setBattleCount(gameState.battleCount || 0);
         setGameHistory(gameState.gameHistory || []);
         setGameEnded(gameState.gameEnded || false);
-        // Fix: Load rest option and streak winner state
+        // Load rest option and streak winner state
         setShowRestOption(gameState.showRestOption || false);
         setStreakWinner(gameState.streakWinner || null);
         
@@ -229,7 +229,7 @@ function App() {
             gameEnded: false,
             playerCount: count,
             playerNames: names,
-            // Fix: Include rest option state in initial sync
+            // Include rest option state in initial sync
             showRestOption: false,
             streakWinner: null
           }
@@ -259,9 +259,9 @@ function App() {
     }
   };
 
-  // Enhanced sync function for multiplayer
+  // Enhanced sync function for multiplayer - anyone can sync now
   const syncGameStateToRoom = async (gameState) => {
-    if (isMultiplayer && isRoomHost) {
+    if (isMultiplayer) {
       try {
         await updateRoomGameState(gameState);
       } catch (error) {
@@ -271,15 +271,9 @@ function App() {
     }
   };
 
-  // Declare winner function - Enhanced with better sync
+  // Declare winner function - anyone can use now
   const declareWinner = async (winnerIndex) => {
     if (!currentFighters[0] || !currentFighters[1] || gameEnded) return;
-    
-    // Fix: Only allow room host to declare winner in multiplayer
-    if (isMultiplayer && !isRoomHost) {
-      showStatus('⚠️ 只有房主可以操作比賽', 'warning');
-      return;
-    }
 
     const winner = currentFighters[winnerIndex - 1];
     const loser = currentFighters[winnerIndex === 1 ? 1 : 0];
@@ -339,7 +333,7 @@ function App() {
       setupNextMatch(updatedPlayers, loser);
     }
 
-    // Enhanced sync to Firebase if in multiplayer mode
+    // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
@@ -350,7 +344,7 @@ function App() {
         gameEnded: false,
         playerCount,
         playerNames,
-        // Fix: Include rest option and streak winner in sync
+        // Include rest option and streak winner in sync
         showRestOption: shouldShowRest,
         streakWinner: shouldShowRest ? updatedWinner : null
       };
@@ -391,15 +385,9 @@ function App() {
     }
   };
 
-  // Handle rest option - Enhanced with better sync
+  // Handle rest option - anyone can use now
   const handleTakeRest = async () => {
     if (!streakWinner) return;
-    
-    // Fix: Only allow room host to handle rest in multiplayer
-    if (isMultiplayer && !isRoomHost) {
-      showStatus('⚠️ 只有房主可以操作比賽', 'warning');
-      return;
-    }
 
     // Give the streak winner 1 additional point but keep them in rotation
     const updatedPlayers = players.map(player => {
@@ -427,7 +415,7 @@ function App() {
       endGame();
     }
 
-    // Enhanced sync to Firebase if in multiplayer mode
+    // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
@@ -438,7 +426,7 @@ function App() {
         gameEnded: false,
         playerCount,
         playerNames,
-        // Fix: Reset rest option state in sync
+        // Reset rest option state in sync
         showRestOption: false,
         streakWinner: null
       };
@@ -461,15 +449,9 @@ function App() {
     return null;
   };
 
-  // Handle continue playing - Enhanced with better sync
+  // Handle continue playing - anyone can use now
   const handleContinuePlay = async () => {
     if (!streakWinner) return;
-    
-    // Fix: Only allow room host to handle continue in multiplayer
-    if (isMultiplayer && !isRoomHost) {
-      showStatus('⚠️ 只有房主可以操作比賽', 'warning');
-      return;
-    }
     
     const winner = streakWinner;
     setStreakWinner(null);
@@ -481,7 +463,7 @@ function App() {
       setCurrentFighters([winner, nextChallenger]);
     }
     
-    // Enhanced sync to Firebase if in multiplayer mode
+    // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
       const newGameState = {
         players,
@@ -492,7 +474,7 @@ function App() {
         gameEnded: false,
         playerCount,
         playerNames,
-        // Fix: Reset rest option state in sync
+        // Reset rest option state in sync
         showRestOption: false,
         streakWinner: null
       };
@@ -502,15 +484,9 @@ function App() {
     showStatus(`💪 ${winner?.name} 選擇繼續比賽！`, 'success');
   };
 
-  // Undo last action - Enhanced with host check
+  // Undo last action - anyone can use now
   const handleUndo = () => {
     if (undoStack.length === 0) return;
-    
-    // Fix: Only allow room host to undo in multiplayer
-    if (isMultiplayer && !isRoomHost) {
-      showStatus('⚠️ 只有房主可以撤銷操作', 'warning');
-      return;
-    }
 
     const lastState = undoStack[undoStack.length - 1];
     setPlayers(lastState.players);
@@ -524,14 +500,8 @@ function App() {
     showStatus('↶ 已撤銷上一步操作', 'info');
   };
 
-  // End game - Enhanced with better sync
+  // End game - anyone can use now
   const endGame = async () => {
-    // Fix: Only allow room host to end game in multiplayer
-    if (isMultiplayer && !isRoomHost) {
-      showStatus('⚠️ 只有房主可以結束比賽', 'warning');
-      return;
-    }
-    
     setGameEnded(true);
     setGameStarted(false);
     
@@ -592,7 +562,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.4.5</div>
+        <div className="version">v1.4.6</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -602,7 +572,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.4.5</div>
+        <div className="version">v1.4.6</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -617,7 +587,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.4.5</div>
+        <div className="version">v1.4.6</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -627,7 +597,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.4.5
+        v1.4.6
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
@@ -642,7 +612,7 @@ function App() {
             🥊 動態競技系統 ({playerCount}人)
             {isMultiplayer && (
               <div className="room-info">
-                {isRoomHost ? '🏠 房主' : '👀 觀戰'} - 房間: {roomCode}
+                房間: {roomCode} - 大家都可以操作
               </div>
             )}
           </h1>
@@ -666,7 +636,7 @@ function App() {
               gameEnded={gameEnded}
               showRestOption={showRestOption}
               hasUndoActions={undoStack.length > 0}
-              isRoomHost={isRoomHost} // Fix: Use actual isRoomHost value
+              isRoomHost={true} // Everyone can control now
               isMultiplayer={isMultiplayer}
               onStartGame={() => {}}
               onDeclareWinner={declareWinner}
@@ -674,7 +644,7 @@ function App() {
               onContinuePlay={handleContinuePlay}
               onUndoAction={handleUndo}
               onEndGame={endGame}
-              onResetGame={returnToRoomBrowser} // Changed: Return to room browser
+              onResetGame={returnToRoomBrowser}
               onToggleHistory={() => setShowHistory(!showHistory)}
               showHistory={showHistory}
               layout="mobile"
