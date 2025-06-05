@@ -57,25 +57,16 @@ const GameHistory = ({ history, onClose }) => {
         <div className="history-content">
           <div className="history-list">
             {history.map((record, index) => (
-              <div key={record.id} className={`history-item ${record.type}`}>
-                <div className="match-number">#{record.battleNumber || index + 1}</div>
-                <div className="match-icon">{getMatchIcon(record)}</div>
-                <div className="match-details">
-                  <div className="match-description">
-                    {getMatchDescription(record)}
-                  </div>
-                  <div className="match-meta">
-                    <span className="match-time">{formatTime(record.timestamp)}</span>
-                    {record.type === 'normal' && (
-                      <>
-                        <span className="winner-score">得分: {record.winnerScore}</span>
-                        {record.winnerStreak > 0 && (
-                          <span className="winner-streak">連勝: {record.winnerStreak}</span>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
+              <div key={record.id || index} className={`history-item-compact ${record.type || 'normal'}`}>
+                <span className="match-number">#{record.battleNumber || index + 1}</span>
+                <span className="match-icon">{getMatchIcon(record)}</span>
+                <span className="match-result">
+                  {getMatchDescription(record)}
+                </span>
+                <span className="match-time">{formatTime(record.timestamp)}</span>
+                {record.type !== 'rest' && record.winnerScore && (
+                  <span className="winner-score">({record.winnerScore}分)</span>
+                )}
               </div>
             ))}
           </div>
@@ -85,15 +76,11 @@ const GameHistory = ({ history, onClose }) => {
           <div className="legend">
             <span className="legend-item">
               <span className="legend-icon">⚔️</span>
-              <span className="legend-text">一般對戰</span>
+              <span className="legend-text">對戰</span>
             </span>
             <span className="legend-item">
               <span className="legend-icon">😴</span>
-              <span className="legend-text">休息記錄</span>
-            </span>
-            <span className="legend-item">
-              <span className="legend-icon">🏁</span>
-              <span className="legend-text">最終對戰</span>
+              <span className="legend-text">休息</span>
             </span>
           </div>
         </div>
