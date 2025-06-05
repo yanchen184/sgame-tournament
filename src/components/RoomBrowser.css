@@ -23,8 +23,33 @@
   font-weight: bold;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.live-indicator {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 .back-btn,
-.refresh-btn {
+.refresh-btn,
+.history-btn {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
@@ -35,10 +60,19 @@
   transition: all 0.3s ease;
 }
 
+.history-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
 .back-btn:hover,
-.refresh-btn:hover {
+.refresh-btn:hover,
+.history-btn:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
+}
+
+.history-btn:hover {
+  background: linear-gradient(135deg, #f093fb 20%, #f5576c 80%);
 }
 
 .refresh-btn:disabled {
@@ -250,16 +284,6 @@
   color: white;
   font-size: 0.7rem;
   animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
 }
 
 .room-info {
@@ -596,6 +620,18 @@
   .room-browser-header h2 {
     font-size: 1.5rem;
   }
+
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .history-btn,
+  .refresh-btn {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+  }
   
   .room-actions {
     grid-template-columns: 1fr;
@@ -665,6 +701,15 @@
   
   .room-browser-header h2 {
     font-size: 1.3rem;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .live-indicator {
+    padding: 4px 8px;
+    font-size: 0.7rem;
   }
   
   .room-card {
