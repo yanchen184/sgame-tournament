@@ -7,6 +7,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
   const [roomCode, setRoomCode] = useState('');
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [mode, setMode] = useState('browse'); // 'browse' or 'join' or 'create'
+  const [firebaseError, setFirebaseError] = useState(null);
 
   const { getActiveRooms } = useFirebaseRoom(true);
 
@@ -17,16 +18,27 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
 
   const loadActiveRooms = async () => {
     setIsLoadingRooms(true);
+    setFirebaseError(null);
     try {
+      console.log('Loading active rooms...');
       const rooms = await getActiveRooms();
-      setActiveRooms(rooms);
+      console.log('Loaded rooms:', rooms);
+      setActiveRooms(rooms || []);
+      
+      // If no rooms found and no Firebase error, show a message
+      if ((!rooms || rooms.length === 0) && !firebaseError) {
+        console.log('No active rooms found, possibly due to Firebase config or empty database');
+      }
     } catch (error) {
       console.error('Failed to load active rooms:', error);
-      // Fallback to mock data if Firebase is not available
+      setFirebaseError(error.message);
+      
+      // Show mock data as fallback for demo purposes
       const mockRooms = [
         {
           id: 'DEMO01',
           displayName: 'DEMO01',
+          roomCode: 'DEMO01',
           playerCount: 4,
           currentPlayers: ['Alice', 'Bob', 'Charlie', 'David'],
           status: 'playing',
@@ -36,6 +48,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
         {
           id: 'DEMO02',
           displayName: 'DEMO02',
+          roomCode: 'DEMO02',
           playerCount: 3,
           currentPlayers: ['Emma', 'Frank', 'Grace'],
           status: 'playing',
@@ -44,6 +57,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
         }
       ];
       setActiveRooms(mockRooms);
+      console.log('Using mock room data for demo');
     } finally {
       setIsLoadingRooms(false);
     }
@@ -188,6 +202,15 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
         </button>
       </div>
 
+      {/* Firebase connection status */}
+      {firebaseError && (
+        <div className="firebase-status error">
+          ⚠️ Firebase 連接問題: {firebaseError}
+          <br />
+          <small>目前顯示的是演示資料，實際功能可能受限</small>
+        </div>
+      )}
+
       <div className="room-actions">
         <button 
           className="action-btn create-btn"
@@ -216,7 +239,11 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
           <div className="empty-state">
             <div className="empty-icon">🤷‍♂️</div>
             <h4>目前沒有進行中的房間</h4>
-            <p>成為第一個創建房間的人吧！</p>
+            {firebaseError ? (
+              <p>Firebase 連接問題，無法載入房間列表</p>
+            ) : (
+              <p>成為第一個創建房間的人吧！</p>
+            )}
             <button 
               className="empty-create-btn"
               onClick={() => setMode('create')}
@@ -233,6 +260,9 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
                   <div className="room-badges">
                     <span className="room-status playing">比賽中</span>
                     <span className="player-count">{room.playerCount}人</span>
+                    {room.id.startsWith('DEMO') && (
+                      <span className="demo-badge">演示</span>
+                    )}
                   </div>
                 </div>
                 
@@ -258,7 +288,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
                 
                 <button 
                   className="join-room-btn"
-                  onClick={() => handleJoinRoom(room.id)}
+                  onClick={() => handleJoinRoom(room.roomCode || room.id)}
                   disabled={isLoading}
                 >
                   {isLoading ? '加入中...' : '👀 觀看比賽'}
