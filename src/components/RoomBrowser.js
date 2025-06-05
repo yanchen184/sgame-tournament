@@ -11,9 +11,62 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
 
   const { getActiveRooms } = useFirebaseRoom(true);
 
-  // Load active rooms
+  // Load active rooms initially
   useEffect(() => {
     loadActiveRooms();
+  }, []);
+
+  // Set up real-time room list updates
+  useEffect(() => {
+    let unsubscribe = null;
+    
+    // Import gameService to set up real-time listener
+    import('../services/gameService').then(({ default: gameService }) => {
+      // Subscribe to real-time updates of the rooms collection
+      unsubscribe = gameService.subscribeToActiveRooms((rooms) => {
+        console.log('Real-time rooms update:', rooms);
+        setActiveRooms(rooms || []);
+        setIsLoadingRooms(false);
+      }, (error) => {
+        console.error('Failed to subscribe to room updates:', error);
+        setFirebaseError(error.message);
+        // Fallback to mock data
+        const mockRooms = [
+          {
+            id: 'DEMO01',
+            displayName: 'DEMO01',
+            roomCode: 'DEMO01',
+            playerCount: 4,
+            currentPlayers: ['Alice', 'Bob', 'Charlie', 'David'],
+            status: 'playing',
+            created: new Date(Date.now() - 15 * 60 * 1000),
+            lastActivity: new Date(Date.now() - 2 * 60 * 1000)
+          },
+          {
+            id: 'DEMO02',
+            displayName: 'DEMO02',
+            roomCode: 'DEMO02',
+            playerCount: 3,
+            currentPlayers: ['Emma', 'Frank', 'Grace'],
+            status: 'playing',
+            created: new Date(Date.now() - 45 * 60 * 1000),
+            lastActivity: new Date(Date.now() - 5 * 60 * 1000)
+          }
+        ];
+        setActiveRooms(mockRooms);
+        setIsLoadingRooms(false);
+      });
+    }).catch((error) => {
+      console.error('Failed to import gameService:', error);
+      loadActiveRooms(); // Fallback to manual loading
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const loadActiveRooms = async () => {
@@ -123,6 +176,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
                 <li>📊 查看積分榜和統計</li>
                 <li>📜 瀏覽比賽歷史</li>
                 <li>🔄 同步接收所有更新</li>
+                <li>🎮 協助控制比賽進行</li>
               </ul>
             </div>
           </div>
@@ -179,7 +233,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
               <ul>
                 <li>房間號不區分大小寫</li>
                 <li>加入後可即時觀看比賽</li>
-                <li>只有房主可以控制比賽</li>
+                <li>所有人都可以控制比賽</li>
                 <li>所有人都能看到即時更新</li>
               </ul>
             </div>
@@ -193,13 +247,16 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
     <div className="room-browser">
       <div className="room-browser-header">
         <h2>🏠 多人房間</h2>
-        <button 
-          className="refresh-btn"
-          onClick={loadActiveRooms}
-          disabled={isLoadingRooms}
-        >
-          {isLoadingRooms ? '⟳' : '🔄'} 刷新
-        </button>
+        <div className="header-status">
+          <span className="live-indicator">🔴 即時更新</span>
+          <button 
+            className="refresh-btn"
+            onClick={loadActiveRooms}
+            disabled={isLoadingRooms}
+          >
+            {isLoadingRooms ? '⟳' : '🔄'} 手動刷新
+          </button>
+        </div>
       </div>
 
       {/* Firebase connection status */}
@@ -303,6 +360,13 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
         <h4>💡 多人模式說明</h4>
         <div className="tips-grid">
           <div className="tip-item">
+            <span className="tip-icon">🔴</span>
+            <div>
+              <strong>即時更新</strong>
+              <p>房間列表自動同步，無需手動刷新</p>
+            </div>
+          </div>
+          <div className="tip-item">
             <span className="tip-icon">🎮</span>
             <div>
               <strong>房主模式</strong>
@@ -314,13 +378,6 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, isLoading }) => {
             <div>
               <strong>觀戰模式</strong>
               <p>加入他人房間，即時觀看比賽進度</p>
-            </div>
-          </div>
-          <div className="tip-item">
-            <span className="tip-icon">🔄</span>
-            <div>
-              <strong>即時同步</strong>
-              <p>所有人都能看到最新的比賽狀態</p>
             </div>
           </div>
           <div className="tip-item">
