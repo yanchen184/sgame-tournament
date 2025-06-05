@@ -295,12 +295,57 @@ function App() {
     }
   };
 
+  // Enhanced setup next match - find next challenger for current champion and return new fighters
+  const setupNextMatch = (playerList, champion, beatenOpponents) => {
+    console.log('Setting up next match for champion:', champion.name);
+    console.log('Already beaten opponents:', beatenOpponents.map(p => p.name));
+    
+    // Find players who haven't been beaten by current champion yet
+    const availableChallengers = playerList.filter(player => 
+      player.id !== champion.id && 
+      !beatenOpponents.some(beaten => beaten.id === player.id)
+    );
+    
+    console.log('Available challengers:', availableChallengers.map(p => p.name));
+    
+    if (availableChallengers.length === 0) {
+      console.log('No available challengers, ending game');
+      return null; // Signal to end game
+    }
+
+    // Get next challenger in rotation order
+    const championPosition = champion.position;
+    let nextChallenger = null;
+    
+    // Find the next available challenger after champion's position
+    for (let i = 1; i < playerList.length; i++) {
+      const nextPosition = (championPosition + i) % playerList.length;
+      const candidate = playerList.find(p => p.position === nextPosition);
+      if (candidate && availableChallengers.some(ac => ac.id === candidate.id)) {
+        nextChallenger = candidate;
+        break;
+      }
+    }
+
+    console.log('Next challenger found:', nextChallenger?.name || 'none');
+    
+    if (nextChallenger) {
+      const newFighters = [champion, nextChallenger];
+      setCurrentFighters(newFighters);
+      return newFighters;
+    } else {
+      return null; // Signal to end game
+    }
+  };
+
   // Enhanced declare winner function with proper tournament rotation logic
   const declareWinner = async (winnerIndex) => {
     if (!currentFighters[0] || !currentFighters[1] || gameEnded) return;
 
     const winner = currentFighters[winnerIndex - 1];
     const loser = currentFighters[winnerIndex === 1 ? 1 : 0];
+
+    console.log(`Winner: ${winner.name}, Loser: ${loser.name}`);
 
     // Save current state to undo stack
     const currentState = {
@@ -351,6 +396,7 @@ function App() {
     let newChampion = currentChampion;
     let newBeatenOpponents = [...championBeatenOpponents];
     let shouldShowRest = false;
+    let newCurrentFighters = currentFighters;
 
     if (winner.id === currentChampion?.id) {
       // Current champion wins - add loser to beaten list if not already there
@@ -358,11 +404,15 @@ function App() {
         newBeatenOpponents.push(loser);
       }
       
+      console.log('Champion continues, beaten opponents now:', newBeatenOpponents.map(p => p.name));
+      
       // Check if champion has beaten all other players (completed a full round)
       const otherPlayers = updatedPlayers.filter(p => p.id !== winner.id);
       const hasBeatenAll = otherPlayers.every(player => 
         newBeatenOpponents.some(beaten => beaten.id === player.id)
       );
+      
+      console.log('Has beaten all players in this round:', hasBeatenAll);
       
       if (hasBeatenAll) {
         shouldShowRest = true;
@@ -370,23 +420,38 @@ function App() {
         setShowRestOption(true);
         showStatus(`🏆 ${winner.name} 完成一輪挑戰！可以選擇休息獲得1分或繼續比賽`, 'warning', true);
       } else {
-        setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
+        // Continue to next match
+        const nextFighters = setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
+        if (nextFighters) {
+          newCurrentFighters = nextFighters;
+        } else {
+          endGame();
+          return;
+        }
       }
     } else {
       // Champion lost - new champion takes over
+      console.log('New champion takes over');
       newChampion = updatedPlayers.find(p => p.id === winner.id);
       newBeatenOpponents = [loser]; // Start fresh with just beaten the previous champion
-      setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
+      
+      const nextFighters = setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
+      if (nextFighters) {
+        newCurrentFighters = nextFighters;
+      } else {
+        endGame();
+        return;
+      }
     }
 
     setCurrentChampion(newChampion);
     setChampionBeatenOpponents(newBeatenOpponents);
 
-    // Sync to Firebase if in multiplayer mode
+    // Sync to Firebase if in multiplayer mode - use the updated fighters
     if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
-        currentFighters,
+        currentFighters: newCurrentFighters, // ✅ Use updated fighters
         battleCount: battleCount + 1,
         gameHistory: [...gameHistory, matchResult],
         gameStarted: true,
@@ -404,41 +469,6 @@ function App() {
     }
 
     showStatus(`🎉 ${winner.name} 獲勝！`, 'success');
-  };
-
-  // Enhanced setup next match - find next challenger for current champion
-  const setupNextMatch = (playerList, champion, beatenOpponents) => {
-    // Find players who haven't been beaten by current champion yet
-    const availableChallengers = playerList.filter(player => 
-      player.id !== champion.id && 
-      !beatenOpponents.some(beaten => beaten.id === player.id)
-    );
-    
-    if (availableChallengers.length === 0) {
-      // This shouldn't happen, but if it does, end the game
-      endGame();
-      return;
-    }
-
-    // Get next challenger in rotation order
-    const championPosition = champion.position;
-    let nextChallenger = null;
-    
-    // Find the next available challenger after champion's position
-    for (let i = 1; i < playerList.length; i++) {
-      const nextPosition = (championPosition + i) % playerList.length;
-      const candidate = playerList.find(p => p.position === nextPosition);
-      if (candidate && availableChallengers.some(ac => ac.id === candidate.id)) {
-        nextChallenger = candidate;
-        break;
-      }
-    }
-
-    if (nextChallenger) {
-      setCurrentFighters([champion, nextChallenger]);
-    } else {
-      endGame();
-    }
   };
 
   // Handle rest option - champion gets bonus point and resets for new round
@@ -469,17 +499,20 @@ function App() {
     const restedChampion = updatedPlayers.find(p => p.id === streakWinner.id);
     const nextChallenger = findNextOpponent(updatedPlayers, restedChampion);
     
+    let newCurrentFighters = [restedChampion, nextChallenger];
+    
     if (nextChallenger) {
-      setCurrentFighters([restedChampion, nextChallenger]);
+      setCurrentFighters(newCurrentFighters);
     } else {
       endGame();
+      return;
     }
 
     // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
-        currentFighters: [restedChampion, nextChallenger],
+        currentFighters: newCurrentFighters,
         battleCount,
         gameHistory,
         gameStarted: true,
@@ -526,15 +559,17 @@ function App() {
     
     // Find next challenger for new round
     const nextChallenger = findNextOpponent(players, champion);
+    let newCurrentFighters = [champion, nextChallenger];
+    
     if (nextChallenger) {
-      setCurrentFighters([champion, nextChallenger]);
+      setCurrentFighters(newCurrentFighters);
     }
     
     // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
       const newGameState = {
         players,
-        currentFighters: [champion, nextChallenger],
+        currentFighters: newCurrentFighters,
         battleCount,
         gameHistory,
         gameStarted: true,
@@ -636,7 +671,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.4.7</div>
+        <div className="version">v1.4.8</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -646,7 +681,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.4.7</div>
+        <div className="version">v1.4.8</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -661,7 +696,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.4.7</div>
+        <div className="version">v1.4.8</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -671,7 +706,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.4.7
+        v1.4.8
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
