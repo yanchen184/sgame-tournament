@@ -7,61 +7,107 @@ const RoomHistory = ({ onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     loadCompletedRooms();
   }, []);
 
+  // Mock data for demonstration
+  const getMockCompletedRooms = () => [
+    {
+      id: 'DEMO01',
+      roomCode: 'ABC123',
+      playerCount: 4,
+      playerNames: ['bob', 'jimmy', 'white', 'dada'],
+      finalResults: {
+        players: [
+          { name: 'bob', score: 8, winStreak: 0 },
+          { name: 'jimmy', score: 6, winStreak: 0 },
+          { name: 'white', score: 4, winStreak: 0 },
+          { name: 'dada', score: 2, winStreak: 0 }
+        ],
+        totalBattles: 20
+      },
+      created: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      ended: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+      duration: 60 * 60 * 1000, // 1 hour
+      totalBattles: 20
+    },
+    {
+      id: 'DEMO02',
+      roomCode: 'XYZ789',
+      playerCount: 3,
+      playerNames: ['alice', 'charlie', 'eve'],
+      finalResults: {
+        players: [
+          { name: 'alice', score: 12, winStreak: 0 },
+          { name: 'charlie', score: 8, winStreak: 0 },
+          { name: 'eve', score: 5, winStreak: 0 }
+        ],
+        totalBattles: 25
+      },
+      created: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+      ended: new Date(Date.now() - 23 * 60 * 60 * 1000), // 23 hours ago
+      duration: 60 * 60 * 1000, // 1 hour
+      totalBattles: 25
+    },
+    {
+      id: 'DEMO03',
+      roomCode: 'DEF456',
+      playerCount: 4,
+      playerNames: ['tom', 'sarah', 'mike', 'lisa'],
+      finalResults: {
+        players: [
+          { name: 'sarah', score: 9, winStreak: 0 },
+          { name: 'tom', score: 7, winStreak: 0 },
+          { name: 'mike', score: 5, winStreak: 0 },
+          { name: 'lisa', score: 3, winStreak: 0 }
+        ],
+        totalBattles: 24
+      },
+      created: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      ended: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000), // 3 days ago + 45 min
+      duration: 45 * 60 * 1000, // 45 minutes
+      totalBattles: 24
+    }
+  ];
+
   const loadCompletedRooms = async () => {
     setIsLoading(true);
     setError(null);
+    setIsDemo(false);
+    
     try {
+      console.log('Attempting to load completed rooms from Firebase...');
       const rooms = await gameService.getCompletedRooms(50);
-      setCompletedRooms(rooms);
+      
+      if (rooms && rooms.length > 0) {
+        console.log('Successfully loaded rooms from Firebase:', rooms.length);
+        setCompletedRooms(rooms);
+        setIsDemo(false);
+      } else {
+        console.log('No completed rooms found in Firebase, using demo data');
+        // If no rooms found, use demo data instead of showing error
+        setCompletedRooms(getMockCompletedRooms());
+        setIsDemo(true);
+      }
     } catch (err) {
-      console.error('Failed to load completed rooms:', err);
-      setError('無法載入歷史記錄');
-      // Fallback to mock data for demo
-      const mockCompletedRooms = [
-        {
-          id: 'HIST01',
-          roomCode: 'ABC123',
-          playerCount: 4,
-          playerNames: ['bob', 'jimmy', 'white', 'dada'],
-          finalResults: {
-            players: [
-              { name: 'bob', score: 8, winStreak: 0 },
-              { name: 'jimmy', score: 6, winStreak: 0 },
-              { name: 'white', score: 4, winStreak: 0 },
-              { name: 'dada', score: 2, winStreak: 0 }
-            ],
-            totalBattles: 20
-          },
-          created: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-          ended: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-          duration: 60 * 60 * 1000, // 1 hour
-          totalBattles: 20
-        },
-        {
-          id: 'HIST02',
-          roomCode: 'XYZ789',
-          playerCount: 3,
-          playerNames: ['alice', 'charlie', 'eve'],
-          finalResults: {
-            players: [
-              { name: 'alice', score: 12, winStreak: 0 },
-              { name: 'charlie', score: 8, winStreak: 0 },
-              { name: 'eve', score: 5, winStreak: 0 }
-            ],
-            totalBattles: 25
-          },
-          created: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-          ended: new Date(Date.now() - 23 * 60 * 60 * 1000), // 23 hours ago
-          duration: 60 * 60 * 1000, // 1 hour
-          totalBattles: 25
-        }
-      ];
-      setCompletedRooms(mockCompletedRooms);
+      console.error('Failed to load completed rooms from Firebase:', err);
+      console.log('Using demo data as fallback');
+      
+      // Use demo data as fallback
+      setCompletedRooms(getMockCompletedRooms());
+      setIsDemo(true);
+      
+      // Set a friendly error message
+      if (err.code === 'permission-denied') {
+        setError('Firebase 權限不足，目前顯示演示資料');
+      } else if (err.code === 'unavailable') {
+        setError('Firebase 服務暫時無法使用，目前顯示演示資料');
+      } else {
+        setError('無法連接到雲端資料庫，目前顯示演示資料');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -152,6 +198,11 @@ const RoomHistory = ({ onBack }) => {
             ← 返回列表
           </button>
           <h2>🏆 比賽詳情</h2>
+          {isDemo && (
+            <div className="demo-badge">
+              演示資料
+            </div>
+          )}
         </div>
 
         <div className="room-details">
@@ -220,17 +271,29 @@ const RoomHistory = ({ onBack }) => {
         </button>
       </div>
 
-      {error && (
+      {/* Demo mode indicator */}
+      {isDemo && (
+        <div className="demo-banner">
+          <div className="demo-content">
+            <span className="demo-icon">🎯</span>
+            <div className="demo-text">
+              <strong>演示模式</strong>
+              <span>目前顯示的是範例資料。完成真實比賽後會顯示實際的歷史記錄。</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Only show error if it's not just demo mode */}
+      {error && !isDemo && (
         <div className="error-message">
           ⚠️ {error}
-          <br />
-          <small>目前顯示的是演示資料</small>
         </div>
       )}
 
       {stats && (
         <div className="global-stats">
-          <h3>🌟 總體統計</h3>
+          <h3>🌟 總體統計 {isDemo && <span className="demo-label">(演示)</span>}</h3>
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-number">{stats.totalGames}</div>
@@ -298,7 +361,10 @@ const RoomHistory = ({ onBack }) => {
             {completedRooms.map((room) => (
               <div key={room.id} className="completed-room-card" onClick={() => setSelectedRoom(room)}>
                 <div className="room-card-header">
-                  <h4 className="room-card-title">🏆 房間 {room.roomCode}</h4>
+                  <h4 className="room-card-title">
+                    🏆 房間 {room.roomCode}
+                    {isDemo && <span className="demo-tag">演示</span>}
+                  </h4>
                   <div className="room-card-badges">
                     <span className="player-count-badge">{room.playerCount}人</span>
                     <span className="battles-badge">{room.totalBattles}場</span>
