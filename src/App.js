@@ -420,14 +420,21 @@ function App() {
     };
     setGameHistory(prev => [...prev, matchResult]);
 
-    // Update champion tracking
+    // Update champion tracking - FIXED LOGIC
     let newChampion = currentChampion;
     let newBeatenOpponents = [...championBeatenOpponents];
     let shouldShowRest = false;
     let newCurrentFighters = currentFighters;
 
+    // Determine winner's position in current fighters array
+    const winnerIndex = currentFighters.findIndex(fighter => fighter.id === winner.id);
+    
+    console.log(`Winner ${winner.name} is at position ${winnerIndex} in current fighters`);
+    console.log(`Current champion: ${currentChampion?.name}`);
+    console.log(`Winner is champion: ${winner.id === currentChampion?.id}`);
+
     if (winner.id === currentChampion?.id) {
-      // Current champion wins
+      // Current champion wins (regardless of position)
       if (!newBeatenOpponents.some(op => op.id === loser.id)) {
         newBeatenOpponents.push(loser);
       }
@@ -460,7 +467,7 @@ function App() {
       // Champion lost - new champion takes over
       console.log('New champion takes over');
       newChampion = updatedPlayers.find(p => p.id === winner.id);
-      newBeatenOpponents = [loser];
+      newBeatenOpponents = [loser]; // Start fresh with new champion
       
       const nextFighters = setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
       if (nextFighters) {
@@ -684,7 +691,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.5.0</div>
+        <div className="version">v1.5.1</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -694,7 +701,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.5.0</div>
+        <div className="version">v1.5.1</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -709,7 +716,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.5.0</div>
+        <div className="version">v1.5.1</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -719,7 +726,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.5.0
+        v1.5.1
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
