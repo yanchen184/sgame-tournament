@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './PlayerSetup.css';
 
-const PlayerSetup = ({ onSetupPlayers, initialNames }) => {
+const PlayerSetup = ({ onSetupPlayers, initialNames, onBack }) => {
   const [playerCount, setPlayerCount] = useState(4); // Default 4 players
   const [playerNames, setPlayerNames] = useState(() => {
     // Initialize with default names based on player count
@@ -74,6 +74,13 @@ const PlayerSetup = ({ onSetupPlayers, initialNames }) => {
   return (
     <div className="setup-container">
       <div className="setup-card">
+        <button 
+          className="back-btn floating"
+          onClick={onBack}
+        >
+          ⬅️ 返回
+        </button>
+        
         <div className="setup-header">
           <h1 className="setup-title">🥊 設置比賽</h1>
           <p className="setup-subtitle">自定義參賽人數和選手名稱</p>
@@ -116,13 +123,8 @@ const PlayerSetup = ({ onSetupPlayers, initialNames }) => {
           </div>
         </div>
 
+        {/* Start Game Button */}
         <div className="setup-actions">
-          <button 
-            className="back-btn"
-            onClick={() => window.history.back()}
-          >
-            ⬅️ 返回
-          </button>
           <button 
             className="start-btn" 
             onClick={startGame}

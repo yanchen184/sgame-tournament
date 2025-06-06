@@ -901,7 +901,11 @@ function App() {
     return (
       <div className="App">
         <div className="version">v1.5.4</div>
-        <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
+        <PlayerSetup 
+          onSetupPlayers={setupPlayers} 
+          initialNames={playerNames}
+          onBack={() => setAppMode('room-browser')}
+        />
       </div>
     );
   }
