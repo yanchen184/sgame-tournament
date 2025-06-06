@@ -376,29 +376,32 @@ function App() {
   const setupMatchBetweenOthers = (playerList, excludedPlayerId = null, recentlyBeatenPlayers = []) => {
     console.log('=== SETUP MATCH BETWEEN OTHERS ===');
     console.log('All players:', playerList.map(p => `${p.name}(pos:${p.position})`));
-    console.log('Excluded player ID:', excludedPlayerId);
-    console.log('Recently beaten players:', recentlyBeatenPlayers.map(p => `${p.name}(pos:${p.position})`));
+    console.log('Excluded player ID (resting):', excludedPlayerId);
     
-    // 1. 排除休息的選手
+    // 1. 找出最後一個被休息選手打敗的選手
+    const lastBeatenPlayer = recentlyBeatenPlayers.length > 0 
+      ? recentlyBeatenPlayers[recentlyBeatenPlayers.length - 1] 
+      : null;
+    console.log('Last beaten player:', lastBeatenPlayer?.name);
+
+    // 2. 篩選可比賽的選手：
+    // - 排除休息的選手
+    // - 排除最後一個被打敗的選手
     const availablePlayers = playerList.filter(player => 
-      excludedPlayerId ? player.id !== excludedPlayerId : true
+      player.id !== excludedPlayerId && // 不是休息選手
+      player.id !== lastBeatenPlayer?.id // 不是最後被打敗的選手
     );
     
-    // 2. 排除最近被打敗的選手（休息前的對手）
-    const eligiblePlayers = availablePlayers.filter(player =>
-      !recentlyBeatenPlayers.some(beaten => beaten.id === player.id)
-    );
+    console.log('Available players:', availablePlayers.map(p => `${p.name}(pos:${p.position})`));
     
-    console.log('Eligible players (excluding resting and recently beaten):', eligiblePlayers.map(p => `${p.name}(pos:${p.position})`));
-    
-    if (eligiblePlayers.length < 2) {
-      console.log('Not enough eligible players for a match');
+    if (availablePlayers.length < 2) {
+      console.log('Not enough available players for a match');
       return null;
     }
 
-    // 3. 從合格的選手中選擇前兩位進行比賽
-    const sortedEligible = eligiblePlayers.sort((a, b) => a.position - b.position);
-    const newFighters = [sortedEligible[0], sortedEligible[1]];
+    // 3. 按照位置順序排序並選擇前兩位進行比賽
+    const sortedPlayers = availablePlayers.sort((a, b) => a.position - b.position);
+    const newFighters = [sortedPlayers[0], sortedPlayers[1]];
     
     console.log('✅ New match setup between:', newFighters.map(p => `${p.name}(pos:${p.position})`));
     console.log('=== END SETUP ===');
