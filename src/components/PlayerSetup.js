@@ -92,35 +92,37 @@ const PlayerSetup = ({ onSetupPlayers, initialNames }) => {
         </div>
 
         {/* Player Names Input */}
-        <div className="names-section">
-          <div className="names-header">
-            <h3>✏️ 選手名稱</h3>
-            <button 
-              className="random-btn"
-              onClick={generateRandomNames}
-              type="button"
-            >
-              🎲 隨機名字
-            </button>
-          </div>
-          
-          <div className="names-grid">
-            {Array.from({ length: playerCount }, (_, index) => (
+        <div className="player-names-section">
+          <h3>👤 選手名稱</h3>
+          <div className="name-inputs">
+            {[...Array(playerCount)].map((_, index) => (
               <div key={index} className="name-input-group">
-                <label htmlFor={`player-${index}`}>
-                  選手 {index + 1}
-                </label>
+                <label>選手 {index + 1}</label>
                 <input
-                  id={`player-${index}`}
                   type="text"
                   value={playerNames[index] || ''}
                   onChange={(e) => handleNameChange(index, e.target.value)}
-                  placeholder={`輸入選手 ${index + 1} 的名字`}
-                  maxLength="20"
+                  placeholder={`選手 ${index + 1}`}
                 />
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="setup-actions">
+          <button 
+            className="back-btn"
+            onClick={() => window.history.back()}
+          >
+            ⬅️ 返回
+          </button>
+          <button 
+            className="start-btn" 
+            onClick={startGame}
+            disabled={!isValid()}
+          >
+            開始比賽 🎮
+          </button>
         </div>
 
         {/* Game Rules Preview */}
@@ -132,16 +134,6 @@ const PlayerSetup = ({ onSetupPlayers, initialNames }) => {
             <li>↶ 支援無限撤銷操作</li>
             <li>📱 針對手機使用優化</li>
           </ul>
-        </div>
-
-        {/* Start Game Button */}
-        <div className="start-section">
-          <button 
-            className="start-game-btn"
-            onClick={startGame}
-          >
-            🚀 開始 {playerCount} 人比賽
-          </button>
         </div>
       </div>
     </div>
