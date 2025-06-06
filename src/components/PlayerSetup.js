@@ -10,6 +10,13 @@ const PlayerSetup = ({ onSetupPlayers, initialNames }) => {
   });
   const [gameStarted, setGameStarted] = useState(false);
 
+  // Validate form
+  const isValid = () => {
+    // 檢查是否所有必要的選手名字都已填寫
+    const requiredNames = playerNames.slice(0, playerCount);
+    return requiredNames.every(name => name && name.trim().length > 0);
+  };
+
   // Handle player count change
   const handlePlayerCountChange = (count) => {
     setPlayerCount(count);
