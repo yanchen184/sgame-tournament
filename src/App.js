@@ -277,18 +277,22 @@ function App() {
 
   // Setup initial match
   const setupInitialMatch = (playerList = players) => {
+    console.log('Setting up initial match with players:', playerList.map(p => p.name));
+    
     const availablePlayers = playerList.filter(p => p);
     if (availablePlayers.length >= 2) {
       const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
-      setCurrentFighters([sortedAvailable[0], sortedAvailable[1]]);
+      const initialFighters = [sortedAvailable[0], sortedAvailable[1]];
+      console.log('Initial fighters:', initialFighters.map(f => f.name));
+      setCurrentFighters(initialFighters);
     }
   };
 
   // Enhanced sync function for multiplayer
-  const syncGameStateToRoom = async (gameState) => {
+  const syncGameStateToRoom = async (gameState, immediate = false) => {
     if (isMultiplayer) {
       try {
-        await updateRoomGameState(gameState);
+        await updateRoomGameState(gameState, immediate);
       } catch (error) {
         console.error('Failed to sync game state to room:', error);
         showStatus('⚠️ 同步失敗，可能會有延遲', 'warning');
@@ -296,9 +300,9 @@ function App() {
     }
   };
 
-  // Setup next match for champion
-  const setupNextMatch = (playerList, champion, beatenOpponents) => {
-    console.log('Setting up next match for champion:', champion.name);
+  // Find next challenger for the champion (improved logic)
+  const findNextChallenger = (playerList, champion, beatenOpponents) => {
+    console.log('Finding next challenger for champion:', champion.name);
     console.log('Already beaten opponents:', beatenOpponents.map(p => p.name));
     
     const availableChallengers = playerList.filter(player => 
@@ -309,10 +313,11 @@ function App() {
     console.log('Available challengers:', availableChallengers.map(p => p.name));
     
     if (availableChallengers.length === 0) {
-      console.log('No available challengers, ending game');
+      console.log('No available challengers');
       return null;
     }
 
+    // Find next challenger in position order
     const championPosition = champion.position;
     let nextChallenger = null;
     
@@ -326,14 +331,7 @@ function App() {
     }
 
     console.log('Next challenger found:', nextChallenger?.name || 'none');
-    
-    if (nextChallenger) {
-      const newFighters = [champion, nextChallenger];
-      setCurrentFighters(newFighters);
-      return newFighters;
-    } else {
-      return null;
-    }
+    return nextChallenger;
   };
 
   // Setup match between other players
@@ -344,20 +342,22 @@ function App() {
       excludedPlayerId ? player.id !== excludedPlayerId : true
     );
     
+    console.log('Available players for new match:', availablePlayers.map(p => p.name));
+    
     if (availablePlayers.length < 2) {
       console.log('Not enough players for a match');
       return null;
     }
 
+    // Sort by position to maintain order
     const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
     const newFighters = [sortedAvailable[0], sortedAvailable[1]];
     
     console.log('New match setup between:', newFighters.map(p => p.name));
+    console.log('New champion will be:', newFighters[0].name);
     
-    setCurrentChampion(newFighters[0]);
-    setChampionBeatenOpponents([]);
-    
-    setCurrentFighters(newFighters);
+    // Return the fighters array but don't set state here
+    // The calling function will handle state updates
     return newFighters;
   };
 
@@ -374,6 +374,9 @@ function App() {
     }
 
     console.log(`Winner: ${winner.name}, Loser: ${loser.name}`);
+    console.log('Current fighters array:', currentFighters.map(f => f?.name));
+    console.log('Current champion:', currentChampion?.name);
+    console.log('Winner position in current fighters:', currentFighters.findIndex(f => f.id === winner.id));
 
     // Save current state to undo stack
     const currentState = {
@@ -420,59 +423,59 @@ function App() {
     };
     setGameHistory(prev => [...prev, matchResult]);
 
-    // Update champion tracking - FIXED LOGIC
-    let newChampion = currentChampion;
+    // Champion tracking logic - winner stays as defending champion
+    let newChampion = updatedPlayers.find(p => p.id === winner.id);
     let newBeatenOpponents = [...championBeatenOpponents];
     let shouldShowRest = false;
     let newCurrentFighters = currentFighters;
 
-    // Determine winner's position in current fighters array
-    const winnerIndex = currentFighters.findIndex(fighter => fighter.id === winner.id);
-    
-    console.log(`Winner ${winner.name} is at position ${winnerIndex} in current fighters`);
-    console.log(`Current champion: ${currentChampion?.name}`);
-    console.log(`Winner is champion: ${winner.id === currentChampion?.id}`);
+    console.log(`Winner ${winner.name} becomes/remains champion`);
 
+    // If the winner was already the champion, continue their streak
     if (winner.id === currentChampion?.id) {
-      // Current champion wins (regardless of position)
+      // Add the loser to beaten opponents if not already there
       if (!newBeatenOpponents.some(op => op.id === loser.id)) {
         newBeatenOpponents.push(loser);
       }
-      
       console.log('Champion continues, beaten opponents now:', newBeatenOpponents.map(p => p.name));
-      
-      // Check if champion has beaten all other players
-      const otherPlayers = updatedPlayers.filter(p => p.id !== winner.id);
-      const hasBeatenAll = otherPlayers.every(player => 
-        newBeatenOpponents.some(beaten => beaten.id === player.id)
-      );
-      
-      console.log('Has beaten all players in this round:', hasBeatenAll);
-      
-      if (hasBeatenAll) {
-        shouldShowRest = true;
-        setStreakWinner(updatedPlayers.find(p => p.id === winner.id));
-        setShowRestOption(true);
-        showStatus(`🏆 ${winner.name} 完成一輪挑戰！可以選擇休息獲得1分或繼續比賽`, 'warning', true);
-      } else {
-        const nextFighters = setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
-        if (nextFighters) {
-          newCurrentFighters = nextFighters;
-        } else {
-          endGame();
-          return;
-        }
-      }
     } else {
-      // Champion lost - new champion takes over
-      console.log('New champion takes over');
-      newChampion = updatedPlayers.find(p => p.id === winner.id);
-      newBeatenOpponents = [loser]; // Start fresh with new champion
-      
-      const nextFighters = setupNextMatch(updatedPlayers, winner, newBeatenOpponents);
-      if (nextFighters) {
-        newCurrentFighters = nextFighters;
+      // New champion takes over - reset the beaten opponents list
+      newBeatenOpponents = [loser];
+      console.log('New champion takes over, starting fresh');
+    }
+    
+    // Check if champion has beaten all other players
+    const otherPlayers = updatedPlayers.filter(p => p.id !== winner.id);
+    const hasBeatenAll = otherPlayers.every(player => 
+      newBeatenOpponents.some(beaten => beaten.id === player.id)
+    );
+    
+    console.log('Has beaten all players in this round:', hasBeatenAll);
+    
+    if (hasBeatenAll) {
+      shouldShowRest = true;
+      setStreakWinner(newChampion);
+      setShowRestOption(true);
+      showStatus(`🏆 ${winner.name} 完成一輪挑戰！可以選擇休息獲得1分或繼續比賽`, 'warning', true);
+    } else {
+      // Find next challenger for the champion
+      const nextChallenger = findNextChallenger(updatedPlayers, newChampion, newBeatenOpponents);
+      if (nextChallenger) {
+        // Keep the champion in their current position, replace the loser with next challenger
+        const winnerIndex = currentFighters.findIndex(f => f.id === winner.id);
+        const loserIndex = currentFighters.findIndex(f => f.id === loser.id);
+        
+        console.log(`Winner was at index ${winnerIndex}, loser was at index ${loserIndex}`);
+        
+        // Create new fighters array with winner staying in place
+        newCurrentFighters = [...currentFighters];
+        newCurrentFighters[loserIndex] = nextChallenger;
+        
+        console.log('Next match setup:', newCurrentFighters.map(f => f.name));
+        console.log(`Champion ${winner.name} stays at position ${winnerIndex}`);
+        console.log(`Next challenger ${nextChallenger.name} takes position ${loserIndex}`);
       } else {
+        console.log('No more challengers available, ending game');
         endGame();
         return;
       }
@@ -480,12 +483,17 @@ function App() {
 
     setCurrentChampion(newChampion);
     setChampionBeatenOpponents(newBeatenOpponents);
+    
+    // Only update fighters if not showing rest option
+    if (!shouldShowRest) {
+      setCurrentFighters(newCurrentFighters);
+    }
 
     // Sync to Firebase if in multiplayer mode
     if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
-        currentFighters: newCurrentFighters,
+        currentFighters: shouldShowRest ? currentFighters : newCurrentFighters,
         battleCount: battleCount + 1,
         gameHistory: [...gameHistory, matchResult],
         gameStarted: true,
@@ -493,11 +501,11 @@ function App() {
         playerCount,
         playerNames,
         showRestOption: shouldShowRest,
-        streakWinner: shouldShowRest ? updatedPlayers.find(p => p.id === winner.id) : null,
+        streakWinner: shouldShowRest ? newChampion : null,
         currentChampion: newChampion,
         championBeatenOpponents: newBeatenOpponents
       };
-      await syncGameStateToRoom(newGameState);
+      await syncGameStateToRoom(newGameState, true); // Use immediate sync for critical updates
     }
 
     showStatus(`🎉 ${winner.name} 獲勝！`, 'success');
@@ -505,15 +513,37 @@ function App() {
 
   // Legacy function for backwards compatibility
   const declareWinner = async (winnerIndex) => {
+    console.log('declareWinner called with index:', winnerIndex);
+    console.log('Current fighters:', currentFighters.map(f => f?.name));
+    
     const winnerName = currentFighters[winnerIndex - 1]?.name;
+    console.log('Winner name resolved to:', winnerName);
+    
     if (winnerName) {
       await declareWinnerByName(winnerName);
+    } else {
+      console.error('Could not resolve winner name for index:', winnerIndex);
     }
   };
 
   // Handle rest option
   const handleTakeRest = async () => {
     if (!streakWinner) return;
+
+    console.log('Handling take rest for:', streakWinner.name);
+
+    // Save current state to undo stack before making changes
+    const currentState = {
+      players: [...players],
+      currentFighters: [...currentFighters],
+      battleCount,
+      gameHistory: [...gameHistory],
+      showRestOption,
+      streakWinner,
+      currentChampion,
+      championBeatenOpponents: [...championBeatenOpponents]
+    };
+    setUndoStack(prev => [...prev, currentState]);
 
     const updatedPlayers = players.map(player => {
       if (player.id === streakWinner.id) {
@@ -526,24 +556,45 @@ function App() {
       return player;
     });
 
+    // Add rest record to history
+    const restRecord = {
+      battleNumber: battleCount + 1,
+      type: 'rest',
+      player: streakWinner.name,
+      action: '選擇休息並獲得1分',
+      timestamp: new Date(),
+      id: `rest_${Date.now()}`
+    };
+
     setPlayers(updatedPlayers);
     setStreakWinner(null);
     setShowRestOption(false);
+    setBattleCount(prev => prev + 1); // Increment battle count for rest action
+    setGameHistory(prev => [...prev, restRecord]); // Add rest record to history
     
     const restedChampionId = streakWinner.id;
     const newCurrentFighters = setupMatchBetweenOthers(updatedPlayers, restedChampionId);
     
     if (!newCurrentFighters) {
+      console.log('Cannot setup new match, ending game');
       endGame();
       return;
     }
+
+    // Update state with new fighters and champion
+    setCurrentFighters(newCurrentFighters);
+    setCurrentChampion(newCurrentFighters[0]);
+    setChampionBeatenOpponents([]);
+
+    console.log('New champion after rest:', newCurrentFighters[0].name);
+    console.log('New challenger:', newCurrentFighters[1].name);
 
     if (isMultiplayer) {
       const newGameState = {
         players: updatedPlayers,
         currentFighters: newCurrentFighters,
-        battleCount,
-        gameHistory,
+        battleCount: battleCount + 1,
+        gameHistory: [...gameHistory, restRecord],
         gameStarted: true,
         gameEnded: false,
         playerCount,
@@ -553,7 +604,7 @@ function App() {
         currentChampion: newCurrentFighters[0],
         championBeatenOpponents: []
       };
-      await syncGameStateToRoom(newGameState);
+      await syncGameStateToRoom(newGameState, true);
     }
 
     showStatus(`😴 ${streakWinner.name} 選擇休息並獲得1分，下場休息，其他人開始比賽`, 'info');
@@ -561,20 +612,31 @@ function App() {
 
   // Find next opponent in rotation
   const findNextOpponent = (playerList, currentPlayer) => {
+    console.log('Finding next opponent for:', currentPlayer.name);
+    
     const currentPosition = currentPlayer.position;
+    console.log('Current player position:', currentPosition);
+    
     for (let i = 1; i < playerList.length; i++) {
       const nextPosition = (currentPosition + i) % playerList.length;
       const candidate = playerList.find(p => p.position === nextPosition);
+      console.log(`Checking position ${nextPosition}, found:`, candidate?.name);
+      
       if (candidate && candidate.id !== currentPlayer.id) {
+        console.log('Next opponent found:', candidate.name);
         return candidate;
       }
     }
+    
+    console.log('No next opponent found');
     return null;
   };
 
   // Handle continue playing
   const handleContinuePlay = async () => {
     if (!streakWinner) return;
+    
+    console.log('Handling continue play for:', streakWinner.name);
     
     const champion = streakWinner;
     setStreakWinner(null);
@@ -583,12 +645,19 @@ function App() {
     setCurrentChampion(champion);
     setChampionBeatenOpponents([]);
     
-    const nextChallenger = findNextOpponent(players, champion);
-    let newCurrentFighters = [champion, nextChallenger];
+    const nextChallenger = findNextChallenger(players, champion, []);
     
-    if (nextChallenger) {
-      setCurrentFighters(newCurrentFighters);
+    if (!nextChallenger) {
+      console.log('No next challenger found, ending game');
+      endGame();
+      return;
     }
+    
+    // Start fresh round - put champion on left, challenger on right
+    let newCurrentFighters = [champion, nextChallenger];
+    setCurrentFighters(newCurrentFighters);
+    
+    console.log('Continue play - New match:', newCurrentFighters.map(f => f.name));
     
     if (isMultiplayer) {
       const newGameState = {
@@ -605,14 +674,14 @@ function App() {
         currentChampion: champion,
         championBeatenOpponents: []
       };
-      await syncGameStateToRoom(newGameState);
+      await syncGameStateToRoom(newGameState, true);
     }
     
     showStatus(`💪 ${champion?.name} 選擇繼續比賽，開始新一輪挑戰！`, 'success');
   };
 
   // Undo last action
-  const handleUndo = () => {
+  const handleUndo = async () => {
     if (undoStack.length === 0) return;
 
     const lastState = undoStack[undoStack.length - 1];
@@ -625,6 +694,25 @@ function App() {
     setCurrentChampion(lastState.currentChampion);
     setChampionBeatenOpponents(lastState.championBeatenOpponents);
     setUndoStack(prev => prev.slice(0, -1));
+
+    // Sync to Firebase if in multiplayer mode
+    if (isMultiplayer) {
+      const undoGameState = {
+        players: lastState.players,
+        currentFighters: lastState.currentFighters,
+        battleCount: lastState.battleCount,
+        gameHistory: lastState.gameHistory,
+        gameStarted: true,
+        gameEnded: false,
+        playerCount,
+        playerNames,
+        showRestOption: lastState.showRestOption,
+        streakWinner: lastState.streakWinner,
+        currentChampion: lastState.currentChampion,
+        championBeatenOpponents: lastState.championBeatenOpponents
+      };
+      await syncGameStateToRoom(undoGameState, true);
+    }
 
     showStatus('↶ 已撤銷上一步操作', 'info');
   };
