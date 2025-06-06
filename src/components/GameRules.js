@@ -28,7 +28,12 @@ const GameRules = ({ playerCount = 4 }) => {
           <div className="rule-icon">🔥</div>
           <div className="rule-content">
             <h4>連勝獎勵</h4>
-            <p>連勝每 {requiredWins} 場（{requiredWins}、{requiredWins * 2}、{requiredWins * 3}...）可選擇加 1 分下場</p>
+            <p>
+              {playerCount >= 4 ? 
+                `連勝每 ${requiredWins} 場（${requiredWins}、${requiredWins * 2}、${requiredWins * 3}...）可選擇加 1 分下場` :
+                '人數少於4人時，不啟用連勝休息機制'
+              }
+            </p>
           </div>
         </div>
         

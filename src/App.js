@@ -372,8 +372,6 @@ function App() {
     setShowTransition(true);
   };
 
-
-
   // Setup match between other players (improved logic for rest scenario)
   const setupMatchBetweenOthers = (playerList, excludedPlayerId = null, recentlyBeatenPlayers = []) => {
     console.log('=== SETUP MATCH BETWEEN OTHERS ===');
@@ -381,87 +379,28 @@ function App() {
     console.log('Excluded player ID:', excludedPlayerId);
     console.log('Recently beaten players:', recentlyBeatenPlayers.map(p => `${p.name}(pos:${p.position})`));
     
+    // 1. 排除休息的選手
     const availablePlayers = playerList.filter(player => 
       excludedPlayerId ? player.id !== excludedPlayerId : true
     );
     
-    console.log('Available players for new match:', availablePlayers.map(p => `${p.name}(pos:${p.position})`));
+    // 2. 排除最近被打敗的選手（休息前的對手）
+    const eligiblePlayers = availablePlayers.filter(player =>
+      !recentlyBeatenPlayers.some(beaten => beaten.id === player.id)
+    );
     
-    if (availablePlayers.length < 2) {
-      console.log('Not enough players for a match');
+    console.log('Eligible players (excluding resting and recently beaten):', eligiblePlayers.map(p => `${p.name}(pos:${p.position})`));
+    
+    if (eligiblePlayers.length < 2) {
+      console.log('Not enough eligible players for a match');
       return null;
     }
 
-    // If we have recently beaten players info, use smart matching
-    if (recentlyBeatenPlayers.length > 0) {
-      // Split players into recently beaten and others
-      const prioritizedPlayers = availablePlayers.filter(player => 
-        !recentlyBeatenPlayers.some(beaten => beaten.id === player.id)
-      );
-      const beatenPlayers = availablePlayers.filter(player => 
-        recentlyBeatenPlayers.some(beaten => beaten.id === player.id)
-      );
-      
-      console.log('Prioritized (not recently beaten):', prioritizedPlayers.map(p => `${p.name}(pos:${p.position})`));
-      console.log('Recently beaten available:', beatenPlayers.map(p => `${p.name}(pos:${p.position})`));
-      
-      // Case 1: We have at least 2 non-beaten players
-      if (prioritizedPlayers.length >= 2) {
-        const sortedPrioritized = prioritizedPlayers.sort((a, b) => a.position - b.position);
-        const newFighters = [sortedPrioritized[0], sortedPrioritized[1]];
-        console.log('✅ Using non-beaten players:', newFighters.map(p => `${p.name}(pos:${p.position})`));
-        console.log('=== END SETUP ===');
-        return newFighters;
-      }
-      
-      // Case 2: We have 1 non-beaten player, pair with earliest beaten player
-      if (prioritizedPlayers.length === 1) {
-        const sortedBeaten = beatenPlayers.sort((a, b) => a.position - b.position);
-        const newFighters = [prioritizedPlayers[0], sortedBeaten[0]];
-        console.log('✅ Pairing non-beaten with earliest beaten player:', newFighters.map(p => `${p.name}(pos:${p.position})`));
-        console.log('=== END SETUP ===');
-        return newFighters;
-      }
-      
-      // Case 3: All available players were recently beaten
-      if (beatenPlayers.length >= 2) {
-        console.log('All available players were recently beaten, using reverse defeat order');
-        
-        // Create a map of player to their defeat order (0 = first defeated, higher = defeated later)
-        const defeatOrderMap = new Map();
-        recentlyBeatenPlayers.forEach((player, index) => {
-          defeatOrderMap.set(player.id, index);
-        });
-        
-        // Sort by defeat order DESC (last defeated first), then by position ASC
-        const sortedByDefeatOrder = beatenPlayers.sort((a, b) => {
-          const aDefeatOrder = defeatOrderMap.get(a.id) ?? -1;
-          const bDefeatOrder = defeatOrderMap.get(b.id) ?? -1;
-          
-          // Higher defeat order (defeated later) gets priority
-          if (bDefeatOrder !== aDefeatOrder) {
-            return bDefeatOrder - aDefeatOrder;
-          }
-          // If same defeat order, sort by position
-          return a.position - b.position;
-        });
-        
-        const newFighters = [sortedByDefeatOrder[0], sortedByDefeatOrder[1]];
-        console.log('✅ Using reverse defeat order:', newFighters.map(p => {
-          const defeatOrder = defeatOrderMap.get(p.id);
-          return `${p.name}(pos:${p.position}, defeatOrder:${defeatOrder})`;
-        }));
-        console.log('=== END SETUP ===');
-        return newFighters;
-      }
-    }
+    // 3. 從合格的選手中選擇前兩位進行比賽
+    const sortedEligible = eligiblePlayers.sort((a, b) => a.position - b.position);
+    const newFighters = [sortedEligible[0], sortedEligible[1]];
     
-    // Fallback: sort all available players by position and take first two
-    const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
-    const newFighters = [sortedAvailable[0], sortedAvailable[1]];
-    
-    console.log('⚠️ Fallback match setup between:', newFighters.map(p => `${p.name}(pos:${p.position})`));
-    console.log('New champion will be:', newFighters[0].name);
+    console.log('✅ New match setup between:', newFighters.map(p => `${p.name}(pos:${p.position})`));
     console.log('=== END SETUP ===');
     
     return newFighters;
@@ -559,7 +498,8 @@ function App() {
     
     console.log('Has beaten all players in this round:', hasBeatenAll);
     
-    if (hasBeatenAll) {
+    // 只有在參賽人數大於等於4人時，才啟用休息機制
+    if (hasBeatenAll && playerCount >= 4) {
       shouldShowRest = true;
       setStreakWinner(newChampion);
       setShowRestOption(true);
