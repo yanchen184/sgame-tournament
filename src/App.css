@@ -246,3 +246,352 @@
     padding: 10px;
   }
 }
+
+/* Final Results Modal */
+.final-results-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(5px);
+}
+
+.final-results-modal {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  color: white;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.final-results-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.final-results-header h3 {
+  font-size: 2em;
+  margin: 0 0 15px 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.champion-highlight {
+  background: linear-gradient(45deg, #ffd700, #ffed4e);
+  color: #333;
+  padding: 12px 20px;
+  border-radius: 25px;
+  font-weight: bold;
+  font-size: 1.1em;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+  animation: championGlow 2s ease-in-out infinite;
+}
+
+@keyframes championGlow {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 6px 25px rgba(255, 215, 0, 0.6);
+  }
+}
+
+.final-rankings {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.ranking-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(5px);
+}
+
+.ranking-item.rank-1 {
+  background: linear-gradient(45deg, #ffd700, #ffed4e);
+  color: #333;
+  font-weight: bold;
+  border: 2px solid #ffd700;
+}
+
+.ranking-item.rank-2 {
+  background: linear-gradient(45deg, #c0c0c0, #e8e8e8);
+  color: #333;
+  font-weight: bold;
+}
+
+.ranking-item.rank-3 {
+  background: linear-gradient(45deg, #cd7f32, #daa520);
+  color: white;
+  font-weight: bold;
+}
+
+.rank-number {
+  font-size: 1.5em;
+  min-width: 50px;
+  text-align: center;
+}
+
+.player-name {
+  flex: 1;
+  font-size: 1.2em;
+  margin: 0 15px;
+  font-weight: bold;
+}
+
+.player-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.score {
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+.streak {
+  font-size: 0.9em;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.final-stats {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 15px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-around;
+  backdrop-filter: blur(10px);
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.9em;
+  opacity: 0.8;
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+.final-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.final-actions .btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1em;
+}
+
+.final-actions .history-btn {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  color: white;
+}
+
+.final-actions .primary-btn {
+  background: linear-gradient(45deg, #4facfe, #00f2fe);
+  color: white;
+}
+
+.final-actions .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Mobile optimizations for final results */
+@media (max-width: 768px) {
+  .final-results-modal {
+    padding: 20px;
+    width: 95%;
+  }
+  
+  .final-results-header h3 {
+    font-size: 1.5em;
+  }
+  
+  .champion-highlight {
+    font-size: 1em;
+    padding: 10px 15px;
+  }
+  
+  .ranking-item {
+    padding: 12px;
+  }
+  
+  .player-name {
+    font-size: 1em;
+    margin: 0 10px;
+  }
+  
+  .rank-number {
+    font-size: 1.2em;
+    min-width: 40px;
+  }
+  
+  .final-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .final-actions .btn {
+    padding: 10px 20px;
+    font-size: 0.9em;
+  }
+}
+
+/* Enhanced Player Queue Styles */
+.queue-mobile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.full-queue-list {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 15px;
+  backdrop-filter: blur(10px);
+}
+
+.queue-title {
+  color: white;
+  margin: 0 0 12px 0;
+  font-size: 1em;
+  text-align: center;
+  font-weight: bold;
+}
+
+.queue-players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.queue-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.queue-player.next-up {
+  background: linear-gradient(45deg, #4facfe, #00f2fe);
+  border: 2px solid #00d4ff;
+  animation: nextPlayerGlow 2s ease-in-out infinite;
+}
+
+@keyframes nextPlayerGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+  }
+}
+
+.queue-position {
+  font-weight: bold;
+  font-size: 0.9em;
+  min-width: 30px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.queue-player-name {
+  flex: 1;
+  font-weight: bold;
+  margin: 0 10px;
+  color: white;
+}
+
+.queue-player.next-up .queue-player-name {
+  color: #003d5c;
+}
+
+.queue-player-score {
+  font-size: 0.9em;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.queue-player.next-up .queue-player-score {
+  color: #003d5c;
+}
+
+.next-indicator {
+  margin-left: 8px;
+  font-size: 1.2em;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.queue-player:hover {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.queue-player.next-up:hover {
+  transform: translateX(3px);
+  background: linear-gradient(45deg, #5bb7fe, #20f4fe);
+}

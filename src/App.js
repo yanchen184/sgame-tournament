@@ -10,6 +10,7 @@ import GameHistory from './components/GameHistory';
 import PlayerSetup from './components/PlayerSetup';
 import RoomBrowser from './components/RoomBrowser';
 import RoomHistory from './components/RoomHistory';
+import PlayerTransition from './components/PlayerTransition';
 import { useFirebaseGame, useFirebaseRoom, useRealtimeRoom } from './hooks/useFirebaseGame';
 
 // Shuffle array utility function
@@ -74,6 +75,12 @@ function App() {
   // Champion tracking state
   const [currentChampion, setCurrentChampion] = useState(null);
   const [championBeatenOpponents, setChampionBeatenOpponents] = useState([]);
+
+  // Animation state for player transitions
+  const [showTransition, setShowTransition] = useState(false);
+  const [transitionData, setTransitionData] = useState(null);
+  const [transitionType, setTransitionType] = useState(null); // 'victory' or 'rest'
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Enable Firebase integration
   const enableFirebase = true;
@@ -150,6 +157,9 @@ function App() {
       if (realtimeGameData.championBeatenOpponents) {
         setChampionBeatenOpponents(realtimeGameData.championBeatenOpponents);
       }
+      if (realtimeGameData.undoStack) {
+        setUndoStack(realtimeGameData.undoStack);
+      }
     }
   }, [realtimeGameData, isMultiplayer]);
 
@@ -189,6 +199,7 @@ function App() {
         setStreakWinner(gameState.streakWinner || null);
         setCurrentChampion(gameState.currentChampion || null);
         setChampionBeatenOpponents(gameState.championBeatenOpponents || []);
+        setUndoStack(gameState.undoStack || []); // Load undo stack from room
         
         setIsMultiplayer(true);
         setGameSetup(true);
@@ -256,7 +267,8 @@ function App() {
             showRestOption: false,
             streakWinner: null,
             currentChampion: shuffledPlayers[0],
-            championBeatenOpponents: []
+            championBeatenOpponents: [],
+            undoStack: [] // Add undo stack to sync
           }
         });
         
@@ -334,30 +346,124 @@ function App() {
     return nextChallenger;
   };
 
-  // Setup match between other players
-  const setupMatchBetweenOthers = (playerList, excludedPlayerId = null) => {
-    console.log('Setting up match between other players, excluding:', excludedPlayerId);
+  // Trigger player transition animation
+  const triggerPlayerTransition = (type, currentFighters, nextPlayer, onComplete) => {
+    if (isTransitioning) {
+      console.log('Already transitioning, skipping animation');
+      if (onComplete) onComplete();
+      return;
+    }
+
+    console.log('Triggering player transition:', { type, nextPlayer: nextPlayer?.name });
+    
+    setIsTransitioning(true);
+    setTransitionType(type);
+    setTransitionData({
+      currentFighters: [...currentFighters],
+      nextPlayer: nextPlayer,
+      onComplete: () => {
+        setIsTransitioning(false);
+        setShowTransition(false);
+        setTransitionData(null);
+        setTransitionType(null);
+        if (onComplete) onComplete();
+      }
+    });
+    setShowTransition(true);
+  };
+
+
+
+  // Setup match between other players (improved logic for rest scenario)
+  const setupMatchBetweenOthers = (playerList, excludedPlayerId = null, recentlyBeatenPlayers = []) => {
+    console.log('=== SETUP MATCH BETWEEN OTHERS ===');
+    console.log('All players:', playerList.map(p => `${p.name}(pos:${p.position})`));
+    console.log('Excluded player ID:', excludedPlayerId);
+    console.log('Recently beaten players:', recentlyBeatenPlayers.map(p => `${p.name}(pos:${p.position})`));
     
     const availablePlayers = playerList.filter(player => 
       excludedPlayerId ? player.id !== excludedPlayerId : true
     );
     
-    console.log('Available players for new match:', availablePlayers.map(p => p.name));
+    console.log('Available players for new match:', availablePlayers.map(p => `${p.name}(pos:${p.position})`));
     
     if (availablePlayers.length < 2) {
       console.log('Not enough players for a match');
       return null;
     }
 
-    // Sort by position to maintain order
+    // If we have recently beaten players info, use smart matching
+    if (recentlyBeatenPlayers.length > 0) {
+      // Split players into recently beaten and others
+      const prioritizedPlayers = availablePlayers.filter(player => 
+        !recentlyBeatenPlayers.some(beaten => beaten.id === player.id)
+      );
+      const beatenPlayers = availablePlayers.filter(player => 
+        recentlyBeatenPlayers.some(beaten => beaten.id === player.id)
+      );
+      
+      console.log('Prioritized (not recently beaten):', prioritizedPlayers.map(p => `${p.name}(pos:${p.position})`));
+      console.log('Recently beaten available:', beatenPlayers.map(p => `${p.name}(pos:${p.position})`));
+      
+      // Case 1: We have at least 2 non-beaten players
+      if (prioritizedPlayers.length >= 2) {
+        const sortedPrioritized = prioritizedPlayers.sort((a, b) => a.position - b.position);
+        const newFighters = [sortedPrioritized[0], sortedPrioritized[1]];
+        console.log('✅ Using non-beaten players:', newFighters.map(p => `${p.name}(pos:${p.position})`));
+        console.log('=== END SETUP ===');
+        return newFighters;
+      }
+      
+      // Case 2: We have 1 non-beaten player, pair with earliest beaten player
+      if (prioritizedPlayers.length === 1) {
+        const sortedBeaten = beatenPlayers.sort((a, b) => a.position - b.position);
+        const newFighters = [prioritizedPlayers[0], sortedBeaten[0]];
+        console.log('✅ Pairing non-beaten with earliest beaten player:', newFighters.map(p => `${p.name}(pos:${p.position})`));
+        console.log('=== END SETUP ===');
+        return newFighters;
+      }
+      
+      // Case 3: All available players were recently beaten
+      if (beatenPlayers.length >= 2) {
+        console.log('All available players were recently beaten, using reverse defeat order');
+        
+        // Create a map of player to their defeat order (0 = first defeated, higher = defeated later)
+        const defeatOrderMap = new Map();
+        recentlyBeatenPlayers.forEach((player, index) => {
+          defeatOrderMap.set(player.id, index);
+        });
+        
+        // Sort by defeat order DESC (last defeated first), then by position ASC
+        const sortedByDefeatOrder = beatenPlayers.sort((a, b) => {
+          const aDefeatOrder = defeatOrderMap.get(a.id) ?? -1;
+          const bDefeatOrder = defeatOrderMap.get(b.id) ?? -1;
+          
+          // Higher defeat order (defeated later) gets priority
+          if (bDefeatOrder !== aDefeatOrder) {
+            return bDefeatOrder - aDefeatOrder;
+          }
+          // If same defeat order, sort by position
+          return a.position - b.position;
+        });
+        
+        const newFighters = [sortedByDefeatOrder[0], sortedByDefeatOrder[1]];
+        console.log('✅ Using reverse defeat order:', newFighters.map(p => {
+          const defeatOrder = defeatOrderMap.get(p.id);
+          return `${p.name}(pos:${p.position}, defeatOrder:${defeatOrder})`;
+        }));
+        console.log('=== END SETUP ===');
+        return newFighters;
+      }
+    }
+    
+    // Fallback: sort all available players by position and take first two
     const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
     const newFighters = [sortedAvailable[0], sortedAvailable[1]];
     
-    console.log('New match setup between:', newFighters.map(p => p.name));
+    console.log('⚠️ Fallback match setup between:', newFighters.map(p => `${p.name}(pos:${p.position})`));
     console.log('New champion will be:', newFighters[0].name);
+    console.log('=== END SETUP ===');
     
-    // Return the fighters array but don't set state here
-    // The calling function will handle state updates
     return newFighters;
   };
 
@@ -419,7 +525,8 @@ function App() {
       winner: winner.name,
       loser: loser.name,
       winnerScore: updatedPlayers.find(p => p.id === winner.id).score,
-      timestamp: new Date()
+      timestamp: new Date().toISOString(), // Use ISO string for better compatibility
+      id: `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
     setGameHistory(prev => [...prev, matchResult]);
 
@@ -503,7 +610,8 @@ function App() {
         showRestOption: shouldShowRest,
         streakWinner: shouldShowRest ? newChampion : null,
         currentChampion: newChampion,
-        championBeatenOpponents: newBeatenOpponents
+        championBeatenOpponents: newBeatenOpponents,
+        undoStack: [...undoStack, currentState] // Sync undo stack
       };
       await syncGameStateToRoom(newGameState, true); // Use immediate sync for critical updates
     }
@@ -531,6 +639,7 @@ function App() {
     if (!streakWinner) return;
 
     console.log('Handling take rest for:', streakWinner.name);
+    console.log('Champion had beaten:', championBeatenOpponents.map(p => p.name));
 
     // Save current state to undo stack before making changes
     const currentState = {
@@ -562,8 +671,8 @@ function App() {
       type: 'rest',
       player: streakWinner.name,
       action: '選擇休息並獲得1分',
-      timestamp: new Date(),
-      id: `rest_${Date.now()}`
+      timestamp: new Date().toISOString(), // Use ISO string for better compatibility
+      id: `rest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
 
     setPlayers(updatedPlayers);
@@ -573,7 +682,8 @@ function App() {
     setGameHistory(prev => [...prev, restRecord]); // Add rest record to history
     
     const restedChampionId = streakWinner.id;
-    const newCurrentFighters = setupMatchBetweenOthers(updatedPlayers, restedChampionId);
+    // Pass the recently beaten opponents to help with match setup
+    const newCurrentFighters = setupMatchBetweenOthers(updatedPlayers, restedChampionId, championBeatenOpponents);
     
     if (!newCurrentFighters) {
       console.log('Cannot setup new match, ending game');
@@ -602,7 +712,8 @@ function App() {
         showRestOption: false,
         streakWinner: null,
         currentChampion: newCurrentFighters[0],
-        championBeatenOpponents: []
+        championBeatenOpponents: [],
+        undoStack: [...undoStack, currentState] // Sync undo stack
       };
       await syncGameStateToRoom(newGameState, true);
     }
@@ -657,8 +768,6 @@ function App() {
     let newCurrentFighters = [champion, nextChallenger];
     setCurrentFighters(newCurrentFighters);
     
-    console.log('Continue play - New match:', newCurrentFighters.map(f => f.name));
-    
     if (isMultiplayer) {
       const newGameState = {
         players,
@@ -672,7 +781,8 @@ function App() {
         showRestOption: false,
         streakWinner: null,
         currentChampion: champion,
-        championBeatenOpponents: []
+        championBeatenOpponents: [],
+        undoStack: []
       };
       await syncGameStateToRoom(newGameState, true);
     }
@@ -709,7 +819,8 @@ function App() {
         showRestOption: lastState.showRestOption,
         streakWinner: lastState.streakWinner,
         currentChampion: lastState.currentChampion,
-        championBeatenOpponents: lastState.championBeatenOpponents
+        championBeatenOpponents: lastState.championBeatenOpponents,
+        undoStack: undoStack.slice(0, -1)
       };
       await syncGameStateToRoom(undoGameState, true);
     }
@@ -721,19 +832,61 @@ function App() {
   const endGame = async () => {
     setGameEnded(true);
     setGameStarted(false);
+    setShowRestOption(false);
+    setStreakWinner(null);
+    
+    // Calculate final results with proper sorting
+    const finalRankedPlayers = [...players].sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return b.winStreak - a.winStreak;
+    });
     
     const finalResults = {
-      players: players.sort((a, b) => b.score - a.score),
+      players: finalRankedPlayers,
       totalBattles: battleCount,
       gameHistory,
-      endTime: new Date()
+      endTime: new Date(),
+      winner: finalRankedPlayers[0],
+      status: 'completed'
     };
 
+    // Add final result to history
+    const finalRecord = {
+      battleNumber: battleCount + 1,
+      type: 'final',
+      winner: finalRankedPlayers[0]?.name || 'Unknown',
+      action: `比賽結束！冠軍是 ${finalRankedPlayers[0]?.name || 'Unknown'}`,
+      timestamp: new Date().toISOString(),
+      id: `final_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    };
+    
+    setGameHistory(prev => [...prev, finalRecord]);
+    setBattleCount(prev => prev + 1);
+
     if (isMultiplayer) {
+      const finalGameState = {
+        players: finalRankedPlayers,
+        currentFighters: [null, null],
+        battleCount: battleCount + 1,
+        gameHistory: [...gameHistory, finalRecord],
+        gameStarted: false,
+        gameEnded: true,
+        playerCount,
+        playerNames,
+        showRestOption: false,
+        streakWinner: null,
+        currentChampion: null,
+        championBeatenOpponents: [],
+        undoStack: [],
+        finalResults
+      };
+      await syncGameStateToRoom(finalGameState, true);
       await endRoom(finalResults);
     }
 
-    showStatus('🏁 比賽結束！查看最終排名', 'success', true);
+    showStatus(`🏁 比賽結束！🏆 冠軍：${finalRankedPlayers[0]?.name || 'Unknown'}！`, 'success', true);
   };
 
   // Return to room browser
@@ -779,7 +932,7 @@ function App() {
   if (appMode === 'history') {
     return (
       <div className="App">
-        <div className="version">v1.5.1</div>
+        <div className="version">v1.5.4</div>
         <RoomHistory onBack={() => setAppMode('room-browser')} />
       </div>
     );
@@ -789,7 +942,7 @@ function App() {
   if (appMode === 'room-browser') {
     return (
       <div className="App">
-        <div className="version">v1.5.1</div>
+        <div className="version">v1.5.4</div>
         <RoomBrowser 
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
@@ -804,7 +957,7 @@ function App() {
   if (appMode === 'player-setup') {
     return (
       <div className="App">
-        <div className="version">v1.5.1</div>
+        <div className="version">v1.5.4</div>
         <PlayerSetup onSetupPlayers={setupPlayers} initialNames={playerNames} />
       </div>
     );
@@ -814,7 +967,7 @@ function App() {
   return (
     <div className="App">
       <div className="version">
-        v1.5.1
+        v1.5.4
         {enableFirebase && (
           <span className="firebase-status">
             {(isMultiplayer ? roomConnected : gameConnected) ? '🔥' : '📡'} 
@@ -874,6 +1027,8 @@ function App() {
             <PlayerQueue 
               players={players}
               currentFighters={currentFighters}
+              currentChampion={currentChampion}
+              championBeatenOpponents={championBeatenOpponents}
               layout="mobile"
             />
           </div>
@@ -888,6 +1043,17 @@ function App() {
           </div>
         </div>
 
+        {/* Player transition animation overlay */}
+        {showTransition && transitionData && (
+          <PlayerTransition 
+            currentFighters={transitionData.currentFighters}
+            nextPlayer={transitionData.nextPlayer}
+            triggerTransition={true}
+            transitionType={transitionType}
+            onTransitionComplete={transitionData.onComplete}
+          />
+        )}
+
         {statusMessage && (
           <StatusMessage 
             message={statusMessage.message}
@@ -895,6 +1061,62 @@ function App() {
             persistent={statusMessage.persistent}
             onClose={statusMessage.persistent ? clearStatusMessage : undefined}
           />
+        )}
+
+        {gameEnded && (
+          <div className="final-results-overlay">
+            <div className="final-results-modal">
+              <div className="final-results-header">
+                <h3>🏆 最終排名</h3>
+                <div className="champion-highlight">
+                  🏆 冠軍：{players.length > 0 ? players.sort((a, b) => b.score - a.score)[0].name : 'Unknown'}
+                </div>
+              </div>
+              
+              <div className="final-rankings">
+                {players
+                  .sort((a, b) => {
+                    if (b.score !== a.score) return b.score - a.score;
+                    return b.winStreak - a.winStreak;
+                  })
+                  .map((player, index) => (
+                    <div key={player.id} className={`ranking-item rank-${index + 1}`}>
+                      <span className="rank-number">
+                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                      </span>
+                      <span className="player-name">{player.name}</span>
+                      <span className="player-stats">
+                        <span className="score">{player.score}分</span>
+                        {player.winStreak > 0 && (
+                          <span className="streak">{player.winStreak}連勝</span>
+                        )}
+                      </span>
+                    </div>
+                  ))
+                }
+              </div>
+              
+              <div className="final-stats">
+                <div className="stat-item">
+                  <span className="stat-label">總戰鬥數：</span>
+                  <span className="stat-value">{battleCount}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">參賽人數：</span>
+                  <span className="stat-value">{playerCount}</span>
+                </div>
+              </div>
+              
+              <div className="final-actions">
+                <button className="btn history-btn" onClick={() => setShowHistory(true)}>
+                  📚 查看歷史
+                </button>
+                <button className="btn primary-btn" onClick={returnToRoomBrowser}>
+                  🏠 回到房間選擇
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {showHistory && (

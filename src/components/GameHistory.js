@@ -3,12 +3,74 @@ import './GameHistory.css';
 
 const GameHistory = ({ history, onClose }) => {
   const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString('zh-TW', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+    try {
+      let date;
+      
+      // Handle different timestamp formats
+      if (!timestamp) {
+        return '時間未知';
+      }
+      
+      // If it's a Firestore Timestamp object
+      if (timestamp && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      }
+      // If it's already a Date object
+      else if (timestamp instanceof Date) {
+        date = timestamp;
+      }
+      // If it's a number (Unix timestamp)
+      else if (typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      }
+      // If it's a string (ISO string or other date string)
+      else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      }
+      // If it has seconds and nanoseconds (Firestore Timestamp)
+      else if (timestamp && typeof timestamp.seconds === 'number') {
+        date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+      }
+      else {
+        console.warn('Unknown timestamp format:', timestamp);
+        return '時間格式錯誤';
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date created from timestamp:', timestamp);
+        return '無效時間';
+      }
+      
+      return date.toLocaleTimeString('zh-TW', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting time:', error, 'timestamp:', timestamp);
+      return '時間錯誤';
+    }
   };
+
+  // Temporary debug to check what's causing Invalid Date
+  React.useEffect(() => {
+    console.log('=== GameHistory Debug ===');
+    console.log('Total history records:', history.length);
+    
+    history.forEach((record, index) => {
+      const timeResult = formatTime(record.timestamp);
+      if (timeResult.includes('錯誤') || timeResult.includes('Invalid') || timeResult.includes('無效')) {
+        console.error(`❌ Problem with record ${index}:`, {
+          record,
+          timestamp: record.timestamp,
+          timestampType: typeof record.timestamp,
+          formattedResult: timeResult
+        });
+      }
+    });
+    console.log('=== End Debug ===');
+  }, [history]);
 
   const getMatchIcon = (record) => {
     switch (record.type) {
@@ -22,7 +84,15 @@ const GameHistory = ({ history, onClose }) => {
     if (record.type === 'rest') {
       return `${record.player} ${record.action}`;
     }
-    return `${record.winner} 擊敗 ${record.loser}`;
+    if (record.type === 'final') {
+      return record.action || `比賽結束！冠軍：${record.winner || 'Unknown'}`;
+    }
+    // Regular match record
+    if (record.winner && record.loser) {
+      return `${record.winner} 擊敗 ${record.loser}`;
+    }
+    // Fallback for invalid data
+    return '無效資料';
   };
 
   if (history.length === 0) {
@@ -57,7 +127,7 @@ const GameHistory = ({ history, onClose }) => {
         <div className="history-content">
           <div className="history-list">
             {history.map((record, index) => (
-              <div key={record.id || index} className={`history-item-compact ${record.type || 'normal'}`}>
+              <div key={record.id || `record_${index}`} className={`history-item-compact ${record.type || 'normal'}`}>
                 <span className="match-number">#{record.battleNumber || index + 1}</span>
                 <span className="match-icon">{getMatchIcon(record)}</span>
                 <span className="match-result">
