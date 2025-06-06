@@ -451,9 +451,12 @@
 /* Mobile optimizations for floating button */
 @media (max-width: 768px) {
   .back-btn.floating {
+    position: fixed;
     top: 10px;
     left: 10px;
     padding: 8px 15px;
     font-size: 0.9em;
+    width: auto;
+    min-width: unset;
   }
 }
