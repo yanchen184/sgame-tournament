@@ -1048,11 +1048,18 @@ function App() {
               </div>
               
               <div className="final-actions">
-                <button className="btn history-btn" onClick={() => setShowHistory(true)}>
-                  📚 查看歷史
-                </button>
-                <button className="btn primary-btn" onClick={returnToRoomBrowser}>
-                  🏠 回到房間選擇
+                <button 
+                  className="btn primary-btn"
+                  onClick={() => {
+                    setAppMode('room-browser');
+                    setGameEnded(false);
+                    setGameStarted(false);
+                    setPlayers([]);
+                    setGameHistory([]);
+                    setBattleCount(0);
+                  }}
+                >
+                  🏠 返回主選單
                 </button>
               </div>
             </div>
