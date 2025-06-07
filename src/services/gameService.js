@@ -1,99 +1,332 @@
+import { generateRoomNumber } from '../utils/gameUtils';
 import { 
   collection, 
   doc, 
   setDoc, 
   getDoc, 
   updateDoc, 
-  addDoc, 
   query, 
+  where, 
+  getDocs, 
+  onSnapshot, 
   orderBy, 
-  limit, 
-  onSnapshot,
+  limit,
   serverTimestamp,
-  where,
-  getDocs,
-  writeBatch
+  deleteField
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-// Collection names
-const COLLECTIONS = {
-  GAMES: 'games',
-  ROOMS: 'rooms', // New collection for multiplayer rooms
-  PLAYERS: 'players',
-  MATCHES: 'matches'
-};
-
 /**
- * Game Management Service
- * Handles all Firebase operations for the tournament system
- * Enhanced with multiplayer room support and optimized sync performance
+ * Room service for handling multiplayer room operations
  */
-class GameService {
-  
-  constructor() {
-    // Cache for subscription listeners to prevent memory leaks
-    this.activeSubscriptions = new Map();
-    // Debounce timer for batch updates
-    this.updateTimer = null;
-    this.pendingUpdates = new Map();
+export class RoomService {
+  /**
+   * Handle room creation
+   * @param {Function} createRoom - Firebase room creation function
+   * @param {Object} gameState - Current game state
+   * @param {Function} showStatus - Status message function
+   * @returns {Promise<Object|null>} - Room result or null if failed
+   */
+  static async handleCreateRoom(createRoom, gameState, showStatus) {
+    try {
+      const roomNumber = await generateRoomNumber();
+      const roomResult = await createRoom({
+        gameName: `競技房間 ${roomNumber}`,
+        players: gameState.players,
+        gameType: 'tournament',
+        playerNames: gameState.playerNames,
+        playerCount: gameState.playerCount,
+        roomNumber: roomNumber,
+        gameState: {
+          ...gameState,
+          roomNumber: roomNumber,
+          undoStack: []
+        }
+      });
+      
+      if (roomResult) {
+        showStatus(`🎮 房間創建成功！房間號: ${roomResult.roomCode}`, 'success');
+        return roomResult;
+      }
+    } catch (error) {
+      console.error('Failed to create room:', error);
+      showStatus('❌ 創建房間失敗，切換到本地模式', 'warning');
+      throw error;
+    }
+    return null;
   }
 
   /**
-   * Create a new game session
-   * @param {Object} gameData - Initial game data
-   * @returns {Promise<string>} - Game ID
+   * Handle room joining
+   * @param {Function} joinRoom - Firebase room join function
+   * @param {string} roomCodeOrId - Room code or ID to join
+   * @param {Function} showStatus - Status message function
+   * @returns {Promise<Object|null>} - Room game data or null if failed
    */
-  async createGame(gameData) {
+  static async handleJoinRoom(joinRoom, roomCodeOrId, showStatus) {
     try {
-      console.log('Creating game with data:', gameData);
-      console.log('Firestore db object:', db);
+      showStatus('🔗 加入房間中...', 'info');
       
-      const gamesRef = collection(db, COLLECTIONS.GAMES);
-      console.log('Games collection reference:', gamesRef);
-      
-      const gameDoc = await addDoc(gamesRef, {
-        ...gameData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        status: 'active'
-      });
-      
-      console.log('Game created with ID:', gameDoc.id);
-      return gameDoc.id;
+      const roomGameData = await joinRoom(roomCodeOrId);
+      if (roomGameData && roomGameData.gameState) {
+        showStatus(`🎉 成功加入房間！`, 'success');
+        return roomGameData;
+      } else {
+        showStatus('❌ 找不到該房間或房間已結束', 'error');
+        return null;
+      }
     } catch (error) {
-      console.error('Error creating game:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-      throw error;
+      console.error('Failed to join room:', error);
+      showStatus('❌ 加入房間失敗', 'error');
+      return null;
     }
   }
 
   /**
-   * Create a new multiplayer room with optimized structure
-   * @param {Object} roomData - Initial room data
-   * @returns {Promise<string>} - Room ID
+   * Sync game state to room
+   * @param {Function} updateRoomGameState - Firebase room update function
+   * @param {Object} gameState - Current game state
+   * @param {boolean} immediate - Whether to sync immediately
+   * @param {Function} showStatus - Status message function
    */
-  async createRoom(roomData) {
+  static async syncGameStateToRoom(updateRoomGameState, gameState, immediate = false, showStatus) {
     try {
-      console.log('Creating room with data:', roomData);
-      
-      const roomsRef = collection(db, COLLECTIONS.ROOMS);
-      const roomDoc = await addDoc(roomsRef, {
+      await updateRoomGameState(gameState, immediate);
+    } catch (error) {
+      console.error('Failed to sync game state to room:', error);
+      showStatus('⚠️ 同步失敗，可能會有延遲', 'warning');
+    }
+  }
+
+  /**
+   * Extract game state from room data for local sync
+   * @param {Object} roomGameData - Room game data from Firebase
+   * @returns {Object} - Extracted game state
+   */
+  static extractGameStateFromRoom(roomGameData) {
+    const gameState = roomGameData.gameState;
+    return {
+      playerCount: gameState.playerCount || 4,
+      playerNames: gameState.playerNames || [],
+      players: gameState.players || [],
+      currentFighters: gameState.currentFighters || [null, null],
+      gameStarted: gameState.gameStarted || false,
+      battleCount: gameState.battleCount || 0,
+      gameHistory: gameState.gameHistory || [],
+      gameEnded: gameState.gameEnded || false,
+      showRestOption: gameState.showRestOption || false,
+      streakWinner: gameState.streakWinner || null,
+      currentChampion: gameState.currentChampion || null,
+      championBeatenOpponents: gameState.championBeatenOpponents || [],
+      undoStack: gameState.undoStack || []
+    };
+  }
+}
+
+/**
+ * Game logic service for handling game operations
+ */
+export class GameLogicService {
+  /**
+   * Setup initial match between first two players
+   * @param {Array<Object>} playerList - List of players
+   * @returns {Array<Object>} - Initial fighters array
+   */
+  static setupInitialMatch(playerList = []) {
+    console.log('Setting up initial match with players:', playerList.map(p => p.name));
+    
+    const availablePlayers = playerList.filter(p => p);
+    if (availablePlayers.length >= 2) {
+      const sortedAvailable = availablePlayers.sort((a, b) => a.position - b.position);
+      const initialFighters = [sortedAvailable[0], sortedAvailable[1]];
+      console.log('Initial fighters:', initialFighters.map(f => f.name));
+      return initialFighters;
+    }
+    return [null, null];
+  }
+
+  /**
+   * Handle legacy declareWinner function for backwards compatibility
+   * @param {number} winnerIndex - Index of winner (1 or 2)
+   * @param {Array<Object>} currentFighters - Current fighters array
+   * @param {Function} declareWinnerByName - Function to declare winner by name
+   */
+  static handleLegacyDeclareWinner(winnerIndex, currentFighters, declareWinnerByName) {
+    console.log('declareWinner called with index:', winnerIndex);
+    console.log('Current fighters:', currentFighters.map(f => f?.name));
+    
+    const winnerName = currentFighters[winnerIndex - 1]?.name;
+    console.log('Winner name resolved to:', winnerName);
+    
+    if (winnerName) {
+      declareWinnerByName(winnerName);
+    } else {
+      console.error('Could not resolve winner name for index:', winnerIndex);
+    }
+  }
+
+  /**
+   * Calculate final game results
+   * @param {Array<Object>} players - Array of players
+   * @param {number} battleCount - Total battle count
+   * @param {Array<Object>} gameHistory - Game history array
+   * @returns {Object} - Final results object
+   */
+  static calculateFinalResults(players, battleCount, gameHistory) {
+    const finalRankedPlayers = [...players].sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return b.winStreak - a.winStreak;
+    });
+    
+    return {
+      players: finalRankedPlayers,
+      totalBattles: battleCount,
+      gameHistory,
+      endTime: new Date(),
+      winner: finalRankedPlayers[0],
+      status: 'completed'
+    };
+  }
+
+  /**
+   * Check if game should end (no more possible matches)
+   * @param {Array<Object>} players - Array of players
+   * @param {Object} currentChampion - Current champion
+   * @param {Array<Object>} championBeatenOpponents - Beaten opponents
+   * @returns {boolean} - Whether game should end
+   */
+  static shouldEndGame(players, currentChampion, championBeatenOpponents) {
+    if (!currentChampion) return true;
+    
+    const otherPlayers = players.filter(p => p.id !== currentChampion.id);
+    const hasBeatenAll = otherPlayers.every(player => 
+      championBeatenOpponents.some(beaten => beaten.id === player.id)
+    );
+    
+    return hasBeatenAll && players.length < 4; // Only end if less than 4 players
+  }
+}
+
+/**
+ * Status message service for handling UI messages
+ */
+export class StatusService {
+  /**
+   * Create status message object
+   * @param {string} message - Message text
+   * @param {string} type - Message type ('info', 'success', 'warning', 'error')
+   * @param {boolean} persistent - Whether message should persist
+   * @returns {Object} - Status message object
+   */
+  static createStatusMessage(message, type = 'info', persistent = false) {
+    return {
+      message,
+      type,
+      persistent,
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Get status message for game events
+   * @param {string} eventType - Type of event
+   * @param {Object} data - Event data
+   * @returns {Object} - Status message
+   */
+  static getGameEventMessage(eventType, data) {
+    switch (eventType) {
+      case 'PLAYER_SETUP':
+        return this.createStatusMessage(
+          `🎮 ${data.count}人比賽開始！準備迎戰`, 
+          'success'
+        );
+        
+      case 'WINNER_DECLARED':
+        return this.createStatusMessage(
+          `🎉 ${data.winnerName} 獲勝！`, 
+          'success'
+        );
+        
+      case 'STREAK_COMPLETE':
+        return this.createStatusMessage(
+          `🏆 ${data.winnerName} 完成一輪挑戰！可以選擇休息獲得1分或繼續比賽`, 
+          'warning', 
+          true
+        );
+        
+      case 'TAKE_REST':
+        return this.createStatusMessage(
+          `😴 ${data.playerName} 選擇休息並獲得1分，下場休息，其他人開始比賽`, 
+          'info'
+        );
+        
+      case 'CONTINUE_PLAY':
+        return this.createStatusMessage(
+          `💪 ${data.playerName} 選擇繼續比賽，開始新一輪挑戰！`, 
+          'success'
+        );
+        
+      case 'GAME_END':
+        return this.createStatusMessage(
+          `🏁 比賽結束！🏆 冠軍：${data.winnerName}！`, 
+          'success', 
+          true
+        );
+        
+      case 'UNDO_ACTION':
+        return this.createStatusMessage(
+          '↶ 已撤銷上一步操作', 
+          'info'
+        );
+        
+      case 'ROOM_CREATED':
+        return this.createStatusMessage(
+          `🎮 房間創建成功！房間號: ${data.roomCode}`, 
+          'success'
+        );
+        
+      case 'ROOM_JOINED':
+        return this.createStatusMessage(
+          `🎉 成功加入房間 ${data.roomCode}！`, 
+          'success'
+        );
+        
+      case 'RETURN_HOME':
+        return this.createStatusMessage(
+          '🏠 已返回房間選擇', 
+          'info'
+        );
+        
+      default:
+        return this.createStatusMessage(data.message || 'Unknown event', 'info');
+    }
+  }
+}
+
+/**
+ * Game state service for handling game state operations with real Firebase
+ */
+export class GameStateService {
+  /**
+   * Create a new room in Firebase
+   */
+  static async createRoom(roomData) {
+    try {
+      const roomRef = doc(collection(db, 'rooms'));
+      const roomWithMetadata = {
         ...roomData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        id: roomRef.id,
+        created: serverTimestamp(),
         lastActivity: serverTimestamp(),
-        status: 'active',
-        isMultiplayer: true,
-        // Add sync optimization flags
-        syncVersion: 1,
-        lastSyncTime: serverTimestamp()
-      });
+        status: 'playing', // Set as 'playing' from start
+        syncVersion: 1
+      };
       
-      console.log('Room created with ID:', roomDoc.id);
-      return roomDoc.id;
+      await setDoc(roomRef, roomWithMetadata);
+      console.log('Room created with ID:', roomRef.id);
+      return roomRef.id;
     } catch (error) {
       console.error('Error creating room:', error);
       throw error;
@@ -101,30 +334,36 @@ class GameService {
   }
 
   /**
-   * Find room by room code with caching
-   * @param {string} roomCode - Room code to search for
-   * @returns {Promise<string|null>} - Room ID or null if not found
+   * Find room by room code
    */
-  async findRoomByCode(roomCode) {
+  static async findRoomByCode(code) {
     try {
-      console.log('Finding room by code:', roomCode);
-      
-      const roomsRef = collection(db, COLLECTIONS.ROOMS);
-      const q = query(
-        roomsRef, 
-        where('roomCode', '==', roomCode),
+      // Search for both active and playing rooms
+      const activeQuery = query(
+        collection(db, 'rooms'),
+        where('roomCode', '==', code),
         where('status', '==', 'active')
       );
       
-      const querySnapshot = await getDocs(q);
+      const playingQuery = query(
+        collection(db, 'rooms'),
+        where('roomCode', '==', code),
+        where('status', '==', 'playing')
+      );
       
-      if (!querySnapshot.empty) {
-        const roomDoc = querySnapshot.docs[0];
-        console.log('Room found:', roomDoc.id);
-        return roomDoc.id;
+      const [activeSnapshot, playingSnapshot] = await Promise.all([
+        getDocs(activeQuery),
+        getDocs(playingQuery)
+      ]);
+      
+      if (!activeSnapshot.empty) {
+        return activeSnapshot.docs[0].id;
       }
       
-      console.log('Room not found for code:', roomCode);
+      if (!playingSnapshot.empty) {
+        return playingSnapshot.docs[0].id;
+      }
+      
       return null;
     } catch (error) {
       console.error('Error finding room by code:', error);
@@ -133,20 +372,17 @@ class GameService {
   }
 
   /**
-   * Get room data with enhanced error handling
-   * @param {string} roomId - Room ID
-   * @returns {Promise<Object>} - Room data
+   * Get room data by ID
    */
-  async getRoom(roomId) {
+  static async getRoom(roomId) {
     try {
-      const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
+      const roomRef = doc(db, 'rooms', roomId);
       const roomSnap = await getDoc(roomRef);
       
       if (roomSnap.exists()) {
-        return { id: roomSnap.id, ...roomSnap.data() };
-      } else {
-        throw new Error('Room not found');
+        return roomSnap.data();
       }
+      return null;
     } catch (error) {
       console.error('Error getting room:', error);
       throw error;
@@ -154,224 +390,11 @@ class GameService {
   }
 
   /**
-   * Get list of active rooms with better performance
-   * @param {number} limitCount - Number of rooms to retrieve
-   * @returns {Promise<Array>} - Array of active rooms
-   */
-  async getActiveRooms(limitCount = 20) {
-    try {
-      console.log('Getting active rooms');
-      
-      const roomsRef = collection(db, COLLECTIONS.ROOMS);
-      const q = query(
-        roomsRef,
-        where('status', '==', 'active'),
-        orderBy('lastActivity', 'desc'),
-        limit(limitCount)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const rooms = [];
-      
-      querySnapshot.forEach((doc) => {
-        const roomData = { id: doc.id, ...doc.data() };
-        rooms.push({
-          id: roomData.id,
-          displayName: roomData.roomCode,
-          roomCode: roomData.roomCode,
-          playerCount: roomData.playerCount || 4,
-          currentPlayers: roomData.playerNames || [],
-          status: 'playing',
-          created: roomData.createdAt?.toDate() || new Date(),
-          lastActivity: roomData.lastActivity?.toDate() || new Date()
-        });
-      });
-      
-      console.log('Found active rooms:', rooms.length);
-      return rooms;
-    } catch (error) {
-      console.error('Error getting active rooms:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get list of completed rooms for history
-   * @param {number} limitCount - Number of rooms to retrieve
-   * @returns {Promise<Array>} - Array of completed rooms
-   */
-  async getCompletedRooms(limitCount = 50) {
-    try {
-      console.log('Getting completed rooms for history');
-      
-      const roomsRef = collection(db, COLLECTIONS.ROOMS);
-      const q = query(
-        roomsRef,
-        where('status', '==', 'completed'),
-        orderBy('endedAt', 'desc'),
-        limit(limitCount)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const rooms = [];
-      
-      querySnapshot.forEach((doc) => {
-        const roomData = { id: doc.id, ...doc.data() };
-        rooms.push({
-          id: roomData.id,
-          roomCode: roomData.roomCode,
-          playerCount: roomData.playerCount || 4,
-          playerNames: roomData.playerNames || [],
-          finalResults: roomData.finalResults,
-          created: roomData.createdAt?.toDate() || new Date(),
-          ended: roomData.endedAt?.toDate() || new Date(),
-          duration: roomData.endedAt && roomData.createdAt 
-            ? roomData.endedAt.toDate() - roomData.createdAt.toDate()
-            : 0,
-          totalBattles: roomData.finalResults?.totalBattles || 0
-        });
-      });
-      
-      console.log('Found completed rooms:', rooms.length);
-      return rooms;
-    } catch (error) {
-      console.error('Error getting completed rooms:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Enhanced subscribe to real-time active rooms updates with connection management
-   * @param {Function} callback - Callback function for updates
-   * @param {Function} errorCallback - Error callback function
-   * @param {number} limitCount - Number of rooms to retrieve
-   * @returns {Function} - Unsubscribe function
-   */
-  subscribeToActiveRooms(callback, errorCallback, limitCount = 20) {
-    try {
-      console.log('Subscribing to active rooms updates');
-      
-      const roomsRef = collection(db, COLLECTIONS.ROOMS);
-      const q = query(
-        roomsRef,
-        where('status', '==', 'active'),
-        orderBy('lastActivity', 'desc'),
-        limit(limitCount)
-      );
-      
-      const unsubscribe = onSnapshot(q, 
-        (querySnapshot) => {
-          console.log('Active rooms update received, changes:', querySnapshot.docChanges().length);
-          const rooms = [];
-          
-          querySnapshot.forEach((doc) => {
-            const roomData = { id: doc.id, ...doc.data() };
-            rooms.push({
-              id: roomData.id,
-              displayName: roomData.roomCode,
-              roomCode: roomData.roomCode,
-              playerCount: roomData.playerCount || 4,
-              currentPlayers: roomData.playerNames || [],
-              status: 'playing',
-              created: roomData.createdAt?.toDate() || new Date(),
-              lastActivity: roomData.lastActivity?.toDate() || new Date()
-            });
-          });
-          
-          console.log('Real-time active rooms count:', rooms.length);
-          callback(rooms);
-        },
-        (error) => {
-          console.error('Error in active rooms subscription:', error);
-          if (errorCallback) {
-            errorCallback(error);
-          }
-        }
-      );
-
-      // Store subscription for cleanup
-      this.activeSubscriptions.set('activeRooms', unsubscribe);
-      
-      return unsubscribe;
-    } catch (error) {
-      console.error('Error subscribing to active rooms:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Optimized batch update for room game state with debouncing
-   * @param {string} roomId - Room ID
-   * @param {Object} gameState - Game state data
-   */
-  async updateRoomGameState(roomId, gameState) {
-    try {
-      console.log('Updating room game state:', roomId);
-      
-      // Clear any pending update timer
-      if (this.updateTimer) {
-        clearTimeout(this.updateTimer);
-      }
-      
-      // Store pending update
-      this.pendingUpdates.set(roomId, gameState);
-      
-      // Debounce updates to reduce Firebase calls
-      this.updateTimer = setTimeout(async () => {
-        const updates = this.pendingUpdates.get(roomId);
-        if (updates) {
-          const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
-          await updateDoc(roomRef, {
-            gameState: updates,
-            updatedAt: serverTimestamp(),
-            lastActivity: serverTimestamp(),
-            syncVersion: (updates.syncVersion || 0) + 1,
-            lastSyncTime: serverTimestamp()
-          });
-          
-          this.pendingUpdates.delete(roomId);
-          console.log('Room game state updated successfully with debouncing');
-        }
-      }, 100); // 100ms debounce to batch rapid updates
-      
-    } catch (error) {
-      console.error('Error updating room game state:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Immediate update for critical game state changes (no debouncing)
-   * @param {string} roomId - Room ID
-   * @param {Object} gameState - Game state data
-   */
-  async updateRoomGameStateImmediate(roomId, gameState) {
-    try {
-      console.log('Immediate room game state update:', roomId);
-      
-      const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
-      await updateDoc(roomRef, {
-        gameState: gameState,
-        updatedAt: serverTimestamp(),
-        lastActivity: serverTimestamp(),
-        syncVersion: (gameState.syncVersion || 0) + 1,
-        lastSyncTime: serverTimestamp()
-      });
-      
-      console.log('Room game state updated immediately');
-    } catch (error) {
-      console.error('Error updating room game state immediately:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Update room activity timestamp
-   * @param {string} roomId - Room ID
    */
-  async updateRoomActivity(roomId) {
+  static async updateRoomActivity(roomId) {
     try {
-      const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
+      const roomRef = doc(db, 'rooms', roomId);
       await updateDoc(roomRef, {
         lastActivity: serverTimestamp()
       });
@@ -382,73 +405,110 @@ class GameService {
   }
 
   /**
-   * Enhanced subscribe to real-time room updates with better error handling
-   * @param {string} roomId - Room ID
-   * @param {Function} callback - Callback function for updates
-   * @param {Function} errorCallback - Error callback function
-   * @returns {Function} - Unsubscribe function
+   * Get active rooms (both active and playing status)
    */
-  subscribeToRoom(roomId, callback, errorCallback) {
+  static async getActiveRooms() {
     try {
-      console.log('Subscribing to room updates:', roomId);
-      
-      const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
-      const unsubscribe = onSnapshot(roomRef, 
-        (doc) => {
-          if (doc.exists()) {
-            const data = doc.data();
-            console.log('Room update received, sync version:', data.syncVersion || 'none');
-            callback({ id: doc.id, ...data });
-          } else {
-            console.log('Room document does not exist');
-            callback(null);
-          }
-        }, 
-        (error) => {
-          console.error('Error in room subscription:', error);
-          if (errorCallback) {
-            errorCallback(error);
-          }
-        }
+      // Get rooms with either 'active' or 'playing' status
+      const activeQuery = query(
+        collection(db, 'rooms'),
+        where('status', '==', 'active'),
+        orderBy('created', 'desc'),
+        limit(10)
       );
-
-      // Store subscription for cleanup
-      this.activeSubscriptions.set(`room_${roomId}`, unsubscribe);
       
-      return unsubscribe;
+      const playingQuery = query(
+        collection(db, 'rooms'),
+        where('status', '==', 'playing'),
+        orderBy('created', 'desc'),
+        limit(10)
+      );
+      
+      const [activeSnapshot, playingSnapshot] = await Promise.all([
+        getDocs(activeQuery),
+        getDocs(playingQuery)
+      ]);
+      
+      const activeRooms = activeSnapshot.docs.map(doc => ({
+        id: doc.id,
+        displayName: doc.data().roomCode || doc.id,
+        roomCode: doc.data().roomCode || doc.id,
+        playerCount: doc.data().playerNames?.length || 0,
+        currentPlayers: doc.data().playerNames || [],
+        status: 'playing',
+        created: doc.data().created?.toDate() || new Date(),
+        lastActivity: doc.data().lastActivity?.toDate() || new Date(),
+        ...doc.data()
+      }));
+      
+      const playingRooms = playingSnapshot.docs.map(doc => ({
+        id: doc.id,
+        displayName: doc.data().roomCode || doc.id,
+        roomCode: doc.data().roomCode || doc.id,
+        playerCount: doc.data().playerNames?.length || 0,
+        currentPlayers: doc.data().playerNames || [],
+        status: 'playing',
+        created: doc.data().created?.toDate() || new Date(),
+        lastActivity: doc.data().lastActivity?.toDate() || new Date(),
+        ...doc.data()
+      }));
+      
+      // Combine and deduplicate
+      const allRooms = [...activeRooms, ...playingRooms];
+      const uniqueRooms = allRooms.filter((room, index, self) => 
+        index === self.findIndex(r => r.id === room.id)
+      );
+      
+      // Sort by last activity
+      return uniqueRooms.sort((a, b) => 
+        new Date(b.lastActivity) - new Date(a.lastActivity)
+      );
     } catch (error) {
-      console.error('Error subscribing to room:', error);
+      console.error('Error getting active rooms:', error);
       throw error;
     }
   }
 
   /**
-   * End room and save final results
-   * @param {string} roomId - Room ID
-   * @param {Object} finalResults - Final room results
+   * Update room game state immediately (for critical updates)
    */
-  async endRoom(roomId, finalResults) {
+  static async updateRoomGameStateImmediate(roomId, gameState) {
     try {
-      console.log('Ending room:', roomId, 'with results:', finalResults);
+      const roomRef = doc(db, 'rooms', roomId);
+      const currentDoc = await getDoc(roomRef);
+      const currentSyncVersion = currentDoc.exists() ? (currentDoc.data().syncVersion || 0) : 0;
       
-      const roomRef = doc(db, COLLECTIONS.ROOMS, roomId);
+      await updateDoc(roomRef, {
+        gameState: gameState,
+        lastActivity: serverTimestamp(),
+        syncVersion: currentSyncVersion + 1
+      });
+    } catch (error) {
+      console.error('Error updating room game state immediately:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update room game state (debounced)
+   */
+  static async updateRoomGameState(roomId, gameState) {
+    // For now, just use immediate update
+    return this.updateRoomGameStateImmediate(roomId, gameState);
+  }
+
+  /**
+   * End a room
+   */
+  static async endRoom(roomId, finalResults) {
+    try {
+      const roomRef = doc(db, 'rooms', roomId);
       await updateDoc(roomRef, {
         status: 'completed',
+        ended: serverTimestamp(),
         finalResults: finalResults,
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
         lastActivity: serverTimestamp()
       });
-      
-      // Clean up subscription if exists
-      const subscriptionKey = `room_${roomId}`;
-      if (this.activeSubscriptions.has(subscriptionKey)) {
-        const unsubscribe = this.activeSubscriptions.get(subscriptionKey);
-        unsubscribe();
-        this.activeSubscriptions.delete(subscriptionKey);
-      }
-      
-      console.log('Room ended successfully');
     } catch (error) {
       console.error('Error ending room:', error);
       throw error;
@@ -456,204 +516,169 @@ class GameService {
   }
 
   /**
-   * Update game state
-   * @param {string} gameId - Game ID
-   * @param {Object} updateData - Data to update
+   * Subscribe to room updates
    */
-  async updateGame(gameId, updateData) {
+  static subscribeToRoom(roomId, onUpdate, onError) {
     try {
-      console.log('Updating game:', gameId, 'with data:', updateData);
+      const roomRef = doc(db, 'rooms', roomId);
       
-      const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
-      await updateDoc(gameRef, {
-        ...updateData,
-        updatedAt: serverTimestamp()
-      });
+      const unsubscribe = onSnapshot(
+        roomRef,
+        (doc) => {
+          if (doc.exists()) {
+            onUpdate(doc.data());
+          } else {
+            onUpdate(null);
+          }
+        },
+        (error) => {
+          console.error('Error in room subscription:', error);
+          if (onError) onError(error);
+        }
+      );
       
-      console.log('Game updated successfully');
+      return unsubscribe;
     } catch (error) {
-      console.error('Error updating game:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        gameId: gameId
-      });
+      console.error('Error setting up room subscription:', error);
+      if (onError) onError(error);
+      return () => {};
+    }
+  }
+
+  /**
+   * Subscribe to active rooms list updates
+   */
+  static subscribeToActiveRooms(onUpdate, onError) {
+    try {
+      // Subscribe to playing rooms
+      const playingQuery = query(
+        collection(db, 'rooms'),
+        where('status', '==', 'playing'),
+        orderBy('created', 'desc'),
+        limit(20)
+      );
+      
+      const unsubscribe = onSnapshot(
+        playingQuery,
+        (querySnapshot) => {
+          const rooms = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              displayName: data.roomCode || doc.id,
+              roomCode: data.roomCode || doc.id,
+              playerCount: data.playerNames?.length || 0,
+              currentPlayers: data.playerNames || [],
+              status: 'playing',
+              created: data.created?.toDate() || new Date(),
+              lastActivity: data.lastActivity?.toDate() || new Date(),
+              ...data
+            };
+          });
+          
+          console.log('Real-time rooms update:', rooms.length, 'rooms');
+          onUpdate(rooms);
+        },
+        (error) => {
+          console.error('Error in active rooms subscription:', error);
+          if (onError) onError(error);
+        }
+      );
+      
+      return unsubscribe;
+    } catch (error) {
+      console.error('Error setting up active rooms subscription:', error);
+      if (onError) onError(error);
+      return () => {};
+    }
+  }
+
+  /**
+   * Create a new game session
+   */
+  static async createGame(initialGameData) {
+    try {
+      const gameRef = doc(collection(db, 'games'));
+      const gameWithMetadata = {
+        ...initialGameData,
+        id: gameRef.id,
+        created: serverTimestamp(),
+        lastActivity: serverTimestamp()
+      };
+      
+      await setDoc(gameRef, gameWithMetadata);
+      return gameRef.id;
+    } catch (error) {
+      console.error('Error creating game:', error);
       throw error;
     }
   }
 
   /**
-   * Get game data
-   * @param {string} gameId - Game ID
-   * @returns {Promise<Object>} - Game data
+   * Update game state
    */
-  async getGame(gameId) {
+  static async updateGame(gameId, gameState) {
     try {
-      const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
-      const gameSnap = await getDoc(gameRef);
-      
-      if (gameSnap.exists()) {
-        return { id: gameSnap.id, ...gameSnap.data() };
-      } else {
-        throw new Error('Game not found');
-      }
+      const gameRef = doc(db, 'games', gameId);
+      await updateDoc(gameRef, {
+        gameState: gameState,
+        lastActivity: serverTimestamp()
+      });
     } catch (error) {
-      console.error('Error getting game:', error);
+      console.error('Error updating game:', error);
       throw error;
     }
   }
 
   /**
    * Save players data
-   * @param {string} gameId - Game ID
-   * @param {Array} players - Players array
    */
-  async savePlayers(gameId, players) {
+  static async savePlayers(gameId, players) {
     try {
-      console.log('Saving players for game:', gameId, 'players:', players);
-      
-      const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
+      const gameRef = doc(db, 'games', gameId);
       await updateDoc(gameRef, {
         players: players,
-        updatedAt: serverTimestamp()
+        lastActivity: serverTimestamp()
       });
-      
-      console.log('Players saved successfully');
     } catch (error) {
       console.error('Error saving players:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        gameId: gameId,
-        playersCount: players.length
-      });
       throw error;
     }
   }
 
   /**
    * Record a match result
-   * @param {string} gameId - Game ID
-   * @param {Object} matchData - Match data
    */
-  async recordMatch(gameId, matchData) {
+  static async recordMatch(gameId, matchData) {
     try {
-      console.log('Recording match for game:', gameId, 'match:', matchData);
+      const gameRef = doc(db, 'games', gameId);
+      const gameDoc = await getDoc(gameRef);
       
-      const matchesRef = collection(db, COLLECTIONS.MATCHES);
-      await addDoc(matchesRef, {
-        gameId: gameId,
-        ...matchData,
-        timestamp: serverTimestamp()
-      });
-      
-      console.log('Match recorded successfully');
+      if (gameDoc.exists()) {
+        const currentHistory = gameDoc.data().gameHistory || [];
+        await updateDoc(gameRef, {
+          gameHistory: [...currentHistory, matchData],
+          lastActivity: serverTimestamp()
+        });
+      }
     } catch (error) {
       console.error('Error recording match:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        gameId: gameId
-      });
       throw error;
     }
   }
 
   /**
-   * Get match history for a game
-   * @param {string} gameId - Game ID
-   * @param {number} limitCount - Number of matches to retrieve
-   * @returns {Promise<Array>} - Array of matches
+   * End a game
    */
-  async getMatchHistory(gameId, limitCount = 50) {
+  static async endGame(gameId, finalResults) {
     try {
-      const matchesRef = collection(db, COLLECTIONS.MATCHES);
-      const q = query(
-        matchesRef,
-        orderBy('timestamp', 'desc'),
-        limit(limitCount)
-      );
-      
-      return new Promise((resolve, reject) => {
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const matches = [];
-          querySnapshot.forEach((doc) => {
-            if (doc.data().gameId === gameId) {
-              matches.push({ id: doc.id, ...doc.data() });
-            }
-          });
-          resolve(matches);
-        }, reject);
-        
-        // Return unsubscribe function for cleanup
-        return unsubscribe;
-      });
-    } catch (error) {
-      console.error('Error getting match history:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Subscribe to real-time game updates
-   * @param {string} gameId - Game ID
-   * @param {Function} callback - Callback function for updates
-   * @returns {Function} - Unsubscribe function
-   */
-  subscribeToGame(gameId, callback) {
-    try {
-      console.log('Subscribing to game updates:', gameId);
-      
-      const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
-      const unsubscribe = onSnapshot(gameRef, (doc) => {
-        if (doc.exists()) {
-          console.log('Game update received:', doc.data());
-          callback({ id: doc.id, ...doc.data() });
-        } else {
-          console.log('Game document does not exist');
-          callback(null);
-        }
-      }, (error) => {
-        console.error('Error in game subscription:', error);
-        throw error;
-      });
-
-      // Store subscription for cleanup
-      this.activeSubscriptions.set(`game_${gameId}`, unsubscribe);
-      
-      return unsubscribe;
-    } catch (error) {
-      console.error('Error subscribing to game:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * End game and save final results
-   * @param {string} gameId - Game ID
-   * @param {Object} finalResults - Final game results
-   */
-  async endGame(gameId, finalResults) {
-    try {
-      console.log('Ending game:', gameId, 'with results:', finalResults);
-      
-      const gameRef = doc(db, COLLECTIONS.GAMES, gameId);
+      const gameRef = doc(db, 'games', gameId);
       await updateDoc(gameRef, {
         status: 'completed',
+        ended: serverTimestamp(),
         finalResults: finalResults,
-        endedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        lastActivity: serverTimestamp()
       });
-      
-      // Clean up subscription if exists
-      const subscriptionKey = `game_${gameId}`;
-      if (this.activeSubscriptions.has(subscriptionKey)) {
-        const unsubscribe = this.activeSubscriptions.get(subscriptionKey);
-        unsubscribe();
-        this.activeSubscriptions.delete(subscriptionKey);
-      }
-      
-      console.log('Game ended successfully');
     } catch (error) {
       console.error('Error ending game:', error);
       throw error;
@@ -661,65 +686,107 @@ class GameService {
   }
 
   /**
-   * Get game statistics
-   * @param {string} gameId - Game ID
-   * @returns {Promise<Object>} - Game statistics
+   * Get game data by ID
    */
-  async getGameStats(gameId) {
+  static async getGame(gameId) {
     try {
-      const game = await this.getGame(gameId);
-      const matches = await this.getMatchHistory(gameId);
+      const gameRef = doc(db, 'games', gameId);
+      const gameSnap = await getDoc(gameRef);
       
-      // Calculate statistics
-      const stats = {
-        totalMatches: matches.length,
-        gameScore: game.players || [],
-        matchHistory: matches,
-        gameStatus: game.status,
-        gameDuration: game.endedAt ? 
-          new Date(game.endedAt.toDate()) - new Date(game.createdAt.toDate()) : 
-          new Date() - new Date(game.createdAt.toDate())
-      };
-      
-      return stats;
+      if (gameSnap.exists()) {
+        return gameSnap.data();
+      }
+      return null;
     } catch (error) {
-      console.error('Error getting game stats:', error);
+      console.error('Error getting game:', error);
       throw error;
     }
   }
 
   /**
-   * Clean up all active subscriptions
+   * Subscribe to game updates
    */
-  cleanup() {
-    console.log('Cleaning up GameService subscriptions:', this.activeSubscriptions.size);
-    this.activeSubscriptions.forEach((unsubscribe, key) => {
-      try {
-        unsubscribe();
-        console.log('Unsubscribed from:', key);
-      } catch (error) {
-        console.error('Error unsubscribing from:', key, error);
-      }
-    });
-    this.activeSubscriptions.clear();
-    
-    // Clear any pending timers
-    if (this.updateTimer) {
-      clearTimeout(this.updateTimer);
-      this.updateTimer = null;
+  static subscribeToGame(gameId, onUpdate) {
+    try {
+      const gameRef = doc(db, 'games', gameId);
+      
+      const unsubscribe = onSnapshot(
+        gameRef,
+        (doc) => {
+          if (doc.exists()) {
+            onUpdate(doc.data());
+          } else {
+            onUpdate(null);
+          }
+        },
+        (error) => {
+          console.error('Error in game subscription:', error);
+        }
+      );
+      
+      return unsubscribe;
+    } catch (error) {
+      console.error('Error setting up game subscription:', error);
+      return () => {};
     }
-    this.pendingUpdates.clear();
+  }
+
+  /**
+   * Get completed rooms with limit
+   */
+  static async getCompletedRooms(limitCount = 50) {
+    try {
+      const q = query(
+        collection(db, 'rooms'),
+        where('status', '==', 'completed'),
+        orderBy('ended', 'desc'),
+        limit(limitCount)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Calculate duration if both created and ended timestamps exist
+          duration: data.ended && data.created ? 
+            data.ended.toMillis() - data.created.toMillis() : null
+        };
+      });
+    } catch (error) {
+      console.error('Error getting completed rooms:', error);
+      throw error;
+    }
   }
 }
 
-// Create and export a singleton instance
-const gameService = new GameService();
-
-// Clean up on page unload
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    gameService.cleanup();
-  });
-}
+// Create service instance with additional methods
+const gameService = {
+  ...GameStateService,
+  
+  // Convenience methods
+  createRoom: GameStateService.createRoom,
+  findRoomByCode: GameStateService.findRoomByCode,
+  getRoom: GameStateService.getRoom,
+  updateRoomActivity: GameStateService.updateRoomActivity,
+  getActiveRooms: GameStateService.getActiveRooms,
+  updateRoomGameStateImmediate: GameStateService.updateRoomGameStateImmediate,
+  updateRoomGameState: GameStateService.updateRoomGameState,
+  endRoom: GameStateService.endRoom,
+  subscribeToRoom: GameStateService.subscribeToRoom,
+  subscribeToActiveRooms: GameStateService.subscribeToActiveRooms,
+  
+  // Game methods
+  createGame: GameStateService.createGame,
+  updateGame: GameStateService.updateGame,
+  savePlayers: GameStateService.savePlayers,
+  recordMatch: GameStateService.recordMatch,
+  endGame: GameStateService.endGame,
+  getGame: GameStateService.getGame,
+  subscribeToGame: GameStateService.subscribeToGame,
+  getCompletedRooms: GameStateService.getCompletedRooms
+};
 
 export default gameService;
