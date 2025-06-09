@@ -104,11 +104,17 @@ export class RoomService {
    * @returns {Object} - Extracted game state
    */
   static extractGameStateFromRoom(roomGameData) {
-    const gameState = roomGameData.gameState;
-    return {
-      playerCount: gameState.playerCount || 4,
-      playerNames: gameState.playerNames || [],
-      players: gameState.players || [],
+    console.log('Extracting game state from room data:', roomGameData);
+    
+    // Check if gameState exists in roomGameData
+    const gameState = roomGameData.gameState || roomGameData;
+    
+    console.log('Game state found:', gameState);
+    
+    const extractedState = {
+      playerCount: gameState.playerCount || roomGameData.playerCount || 4,
+      playerNames: gameState.playerNames || roomGameData.playerNames || [],
+      players: gameState.players || roomGameData.players || [],
       currentFighters: gameState.currentFighters || [null, null],
       gameStarted: gameState.gameStarted || false,
       battleCount: gameState.battleCount || 0,
@@ -120,6 +126,9 @@ export class RoomService {
       championBeatenOpponents: gameState.championBeatenOpponents || [],
       undoStack: gameState.undoStack || []
     };
+    
+    console.log('Extracted state:', extractedState);
+    return extractedState;
   }
 }
 
@@ -409,57 +418,62 @@ export class GameStateService {
    */
   static async getActiveRooms() {
     try {
-      // Get rooms with either 'active' or 'playing' status
-      const activeQuery = query(
-        collection(db, 'rooms'),
-        where('status', '==', 'active'),
-        orderBy('created', 'desc'),
-        limit(10)
-      );
-      
+      // 簡化查詢，避免複合索引需求
+      // 只按狀態查詢，在客戶端排序
       const playingQuery = query(
         collection(db, 'rooms'),
         where('status', '==', 'playing'),
-        orderBy('created', 'desc'),
-        limit(10)
+        limit(20)
       );
       
-      const [activeSnapshot, playingSnapshot] = await Promise.all([
-        getDocs(activeQuery),
-        getDocs(playingQuery)
+      const activeQuery = query(
+        collection(db, 'rooms'),
+        where('status', '==', 'active'),
+        limit(20)
+      );
+      
+      const [playingSnapshot, activeSnapshot] = await Promise.all([
+        getDocs(playingQuery),
+        getDocs(activeQuery)
       ]);
       
-      const activeRooms = activeSnapshot.docs.map(doc => ({
-        id: doc.id,
-        displayName: doc.data().roomCode || doc.id,
-        roomCode: doc.data().roomCode || doc.id,
-        playerCount: doc.data().playerNames?.length || 0,
-        currentPlayers: doc.data().playerNames || [],
-        status: 'playing',
-        created: doc.data().created?.toDate() || new Date(),
-        lastActivity: doc.data().lastActivity?.toDate() || new Date(),
-        ...doc.data()
-      }));
+      const playingRooms = playingSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          displayName: data.roomCode || doc.id,
+          roomCode: data.roomCode || doc.id,
+          playerCount: data.playerNames?.length || 0,
+          currentPlayers: data.playerNames || [],
+          status: 'playing',
+          created: data.created?.toDate() || new Date(),
+          lastActivity: data.lastActivity?.toDate() || new Date(),
+          ...data
+        };
+      });
       
-      const playingRooms = playingSnapshot.docs.map(doc => ({
-        id: doc.id,
-        displayName: doc.data().roomCode || doc.id,
-        roomCode: doc.data().roomCode || doc.id,
-        playerCount: doc.data().playerNames?.length || 0,
-        currentPlayers: doc.data().playerNames || [],
-        status: 'playing',
-        created: doc.data().created?.toDate() || new Date(),
-        lastActivity: doc.data().lastActivity?.toDate() || new Date(),
-        ...doc.data()
-      }));
+      const activeRooms = activeSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          displayName: data.roomCode || doc.id,
+          roomCode: data.roomCode || doc.id,
+          playerCount: data.playerNames?.length || 0,
+          currentPlayers: data.playerNames || [],
+          status: 'playing',
+          created: data.created?.toDate() || new Date(),
+          lastActivity: data.lastActivity?.toDate() || new Date(),
+          ...data
+        };
+      });
       
-      // Combine and deduplicate
-      const allRooms = [...activeRooms, ...playingRooms];
+      // 合併並去重
+      const allRooms = [...playingRooms, ...activeRooms];
       const uniqueRooms = allRooms.filter((room, index, self) => 
         index === self.findIndex(r => r.id === room.id)
       );
       
-      // Sort by last activity
+      // 在客戶端按最後活動時間排序
       return uniqueRooms.sort((a, b) => 
         new Date(b.lastActivity) - new Date(a.lastActivity)
       );
@@ -550,11 +564,10 @@ export class GameStateService {
    */
   static subscribeToActiveRooms(onUpdate, onError) {
     try {
-      // Subscribe to playing rooms
+      // 簡化查詢，避免複合索引
       const playingQuery = query(
         collection(db, 'rooms'),
         where('status', '==', 'playing'),
-        orderBy('created', 'desc'),
         limit(20)
       );
       
@@ -576,8 +589,13 @@ export class GameStateService {
             };
           });
           
-          console.log('Real-time rooms update:', rooms.length, 'rooms');
-          onUpdate(rooms);
+          // 在客戶端按最後活動時間排序
+          const sortedRooms = rooms.sort((a, b) => 
+            new Date(b.lastActivity) - new Date(a.lastActivity)
+          );
+          
+          console.log('Real-time rooms update:', sortedRooms.length, 'rooms');
+          onUpdate(sortedRooms);
         },
         (error) => {
           console.error('Error in active rooms subscription:', error);

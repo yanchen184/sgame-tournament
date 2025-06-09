@@ -40,6 +40,8 @@ export const useFirebaseRoom = (enableFirebase = false) => {
       setError(null);
       
       const newRoomCode = generateRoomCode();
+      console.log('Creating room with code:', newRoomCode);
+      
       const roomData = {
         ...initialGameData,
         roomCode: newRoomCode,
@@ -47,10 +49,11 @@ export const useFirebaseRoom = (enableFirebase = false) => {
         hostId: 'user_' + Date.now(), // Simple user ID for demo
         createdAt: new Date(),
         lastActivity: new Date(),
-        status: 'active'
+        status: 'playing' // 改為 'playing' 與 gameService 保持一致
       };
       
       const newRoomId = await gameService.createRoom(roomData);
+      console.log('Room created with ID:', newRoomId, 'and code:', newRoomCode);
       
       setRoomId(newRoomId);
       setRoomCode(newRoomCode);
@@ -91,7 +94,7 @@ export const useFirebaseRoom = (enableFirebase = false) => {
       }
       
       // Check if room is still active
-      if (roomGameData.status !== 'active') {
+      if (roomGameData.status !== 'playing' && roomGameData.status !== 'active') {
         setError('房間已結束');
         return null;
       }

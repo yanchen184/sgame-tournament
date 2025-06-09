@@ -24,21 +24,7 @@
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.version {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  background: #4CAF50;
-  color: white;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.8em;
-  font-weight: bold;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+/* Removed .version styles - now handled by VersionDisplay component */
 
 .firebase-status {
   display: flex;
@@ -204,13 +190,7 @@
     flex-wrap: wrap;
   }
   
-  .version {
-    position: static;
-    display: inline-flex;
-    margin-bottom: 10px;
-    font-size: 0.7em;
-    padding: 4px 10px;
-  }
+  /* Version display handled by VersionDisplay component */
   
   .mobile-game-layout {
     gap: 15px;

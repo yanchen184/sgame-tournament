@@ -448,15 +448,88 @@
   transform: translateY(0);
 }
 
-/* Mobile optimizations for floating button */
+/* Room Info Styles */
+.room-info {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 15px;
+  margin: 20px 0;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+}
+
+.room-code-display h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  opacity: 0.9;
+}
+
+.room-code {
+  font-size: 2.5em;
+  font-weight: bold;
+  letter-spacing: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 15px 20px;
+  border-radius: 10px;
+  margin: 15px 0;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  animation: codeGlow 2s infinite;
+  font-family: 'Courier New', monospace;
+}
+
+@keyframes codeGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.5);
+  }
+}
+
+.room-status {
+  margin: 10px 0;
+  font-size: 1em;
+  opacity: 0.9;
+}
+
+.room-hint {
+  margin: 10px 0 0 0;
+  font-size: 0.9em;
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.room-creating {
+  padding: 15px;
+  opacity: 0.9;
+}
+
+.room-creating p {
+  margin: 0;
+  font-size: 1.1em;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Mobile optimizations for room info */
 @media (max-width: 768px) {
-  .back-btn.floating {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    padding: 8px 15px;
-    font-size: 0.9em;
-    width: auto;
-    min-width: unset;
+  .room-info {
+    margin: 15px 0;
+    padding: 15px;
+  }
+  
+  .room-code {
+    font-size: 2em;
+    letter-spacing: 2px;
+    padding: 12px 15px;
+  }
+  
+  .room-code-display h3 {
+    font-size: 1.1em;
   }
 }

@@ -141,56 +141,10 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
   };
 
   if (mode === 'create') {
-    return (
-      <div className="room-browser">
-        <div className="room-browser-header">
-          <button 
-            className="back-btn"
-            onClick={() => setMode('browse')}
-          >
-            ← 返回
-          </button>
-          <h2>🎮 創建新房間</h2>
-        </div>
-        
-        <div className="create-room-section">
-          <div className="create-room-info">
-            <h3>🏠 成為房主</h3>
-            <p>作為房主，你將創建一個新的比賽房間。</p>
-            <p>其他人可以通過房間號加入觀看和參與比賽。</p>
-            
-            <div className="host-benefits">
-              <h4>房主權限：</h4>
-              <ul>
-                <li>🎯 控制比賽進行（記錄勝負）</li>
-                <li>⚙️ 設定比賽規則和人數</li>
-                <li>🏁 決定比賽何時結束</li>
-                <li>🔄 管理撤銷操作</li>
-              </ul>
-            </div>
-            
-            <div className="guest-info">
-              <h4>觀戰者可以：</h4>
-              <ul>
-                <li>👀 即時觀看比賽進度</li>
-                <li>📊 查看積分榜和統計</li>
-                <li>📜 瀏覽比賽歷史</li>
-                <li>🔄 同步接收所有更新</li>
-                <li>🎮 協助控制比賽進行</li>
-              </ul>
-            </div>
-          </div>
-          
-          <button 
-            className="create-room-btn"
-            onClick={onCreateRoom}
-            disabled={isLoading}
-          >
-            {isLoading ? '創建中...' : '🚀 創建房間並開始比賽'}
-          </button>
-        </div>
-      </div>
-    );
+    // 直接創建房間，不顯示說明頁面
+    onCreateRoom();
+    setMode('browse'); // 返回瀏覽模式
+    return null;
   }
 
   if (mode === 'join') {
@@ -233,7 +187,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
               <ul>
                 <li>房間號不區分大小寫</li>
                 <li>加入後可即時觀看比賽</li>
-                <li>所有人都可以控制比賽</li>
+                <li>所有人都能一起控制比賽</li>
                 <li>所有人都能看到即時更新</li>
               </ul>
             </div>
@@ -354,7 +308,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
                   onClick={() => handleJoinRoom(room.roomCode || room.id)}
                   disabled={isLoading}
                 >
-                  {isLoading ? '加入中...' : '👀 觀看比賽'}
+                  {isLoading ? '加入中...' : '🎮 加入比賽'}
                 </button>
               </div>
             ))}
@@ -382,15 +336,15 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
           <div className="tip-item">
             <span className="tip-icon">🎮</span>
             <div>
-              <strong>房主模式</strong>
-              <p>創建房間後成為房主，擁有比賽控制權</p>
+              <strong>創建房間</strong>
+              <p>創建房間後所有人都可以一起控制比賽</p>
             </div>
           </div>
           <div className="tip-item">
             <span className="tip-icon">👀</span>
             <div>
-              <strong>觀戰模式</strong>
-              <p>加入他人房間，即時觀看比賽進度</p>
+              <strong>加入比賽</strong>
+              <p>加入他人房間，大家一起參與比賽進行</p>
             </div>
           </div>
         </div>

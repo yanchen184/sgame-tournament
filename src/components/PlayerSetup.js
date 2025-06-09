@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import './PlayerSetup.css';
 
-const PlayerSetup = ({ onSetupPlayers, initialNames, onBack }) => {
+const PlayerSetup = ({ onSetupPlayers, initialNames, onBack, isMultiplayer, roomCode, isRoomHost, roomConnected }) => {
   const [playerCount, setPlayerCount] = useState(4); // Default 4 players
   const [playerNames, setPlayerNames] = useState(() => {
     // Initialize with default names based on player count
     const defaultNames = ['bob', 'jimmy', 'white', 'dada', 'alex', 'sam', 'chris', 'taylor'];
-    return Array.from({ length: 8 }, (_, i) => initialNames[i] || defaultNames[i] || `選手${i + 1}`);
+    return Array.from({ length: 8 }, (_, i) => {
+      if (initialNames && initialNames[i]) {
+        return initialNames[i];
+      }
+      return defaultNames[i] || `選手${i + 1}`;
+    });
   });
   const [gameStarted, setGameStarted] = useState(false);
 
@@ -84,6 +89,30 @@ const PlayerSetup = ({ onSetupPlayers, initialNames, onBack }) => {
         <div className="setup-header">
           <h1 className="setup-title">🥊 設置比賽</h1>
           <p className="setup-subtitle">自定義參賽人數和選手名稱</p>
+          
+          {/* 顯示房間資訊 */}
+          {isMultiplayer && (
+            <div className="room-info">
+              {roomCode ? (
+                <div className="room-code-display">
+                  <h3>🏠 房間號碼</h3>
+                  <div className="room-code">{roomCode}</div>
+                  <p className="room-status">
+                    {roomConnected ? (
+                      <>🔥 Firebase 已連接</>
+                    ) : (
+                      <>⏳ 連接中...</>
+                    )}
+                  </p>
+                  <p className="room-hint">分享此號碼讓朋友加入觀戰</p>
+                </div>
+              ) : (
+                <div className="room-creating">
+                  <p>🎮 準備創建多人房間...</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Player Count Selection */}
@@ -120,6 +149,16 @@ const PlayerSetup = ({ onSetupPlayers, initialNames, onBack }) => {
                 />
               </div>
             ))}
+          </div>
+          
+          <div className="name-actions">
+            <button 
+              className="random-names-btn" 
+              onClick={generateRandomNames}
+              type="button"
+            >
+              🎲 隨機名稱
+            </button>
           </div>
         </div>
 
