@@ -1,6 +1,6 @@
 /**
  * Simplified Streak Tournament Game Engine
- * Focus only on streak-based tournament functionality
+ * Focus only on streak-based tournament functionality with enhanced visual support
  */
 
 import { STREAK_CONFIG } from '../constants';
@@ -139,8 +139,16 @@ export class StreakGameEngine {
       isGameStarted: this.isGameStarted,
       isGameFinished: this.isGameFinished,
       restRequirement: this.restRequirement,
-      leaderboard: this._getLeaderboard()
+      leaderboard: this._getLeaderboard(),
+      nextPlayerInQueue: this._getNextPlayer()
     };
+  }
+
+  /**
+   * Get next player in queue for visual preview
+   */
+  getNextPlayerInQueue() {
+    return this._getNextPlayer();
   }
 
   /**
@@ -215,7 +223,7 @@ export class StreakGameEngine {
   }
 
   _getNextPlayer() {
-    return this.players.find(p => !p.isActive && !p.isResting);
+    return this.players.find(p => !p.isActive && !p.isResting) || null;
   }
 
   _handleNoAvailablePlayers(currentWinner) {
