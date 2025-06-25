@@ -1,6 +1,6 @@
 /**
- * Simplified Game Container - Streak Tournament Only
- * Main game interface with all game components
+ * Simplified Game Container - Enhanced Visual Flow
+ * Main game interface without rules (moved to setup page)
  */
 
 import React from 'react';
@@ -12,7 +12,6 @@ import PlayerQueue from '../components/PlayerQueue';
 import Scoreboard from '../components/Scoreboard';
 import GameControls from '../components/GameControls';
 import GameHistory from '../components/GameHistory';
-import GameRules from '../components/GameRules';
 
 // Styles
 import './GameContainer.css';
@@ -48,8 +47,19 @@ const GameContainer = () => {
   const currentMatch = getCurrentMatch();
   const leaderboard = getLeaderboard();
 
+  // Get next player in queue for visual preview
+  const getNextPlayerInQueue = () => {
+    if (!gameState.players) return null;
+    
+    // Find players who are not currently active and not resting
+    const queuedPlayers = gameState.players.filter(p => !p.isActive && !p.isResting);
+    return queuedPlayers.length > 0 ? queuedPlayers[0] : null;
+  };
+
+  const nextPlayerInQueue = getNextPlayerInQueue();
+
   return (
-    <div className="game-container">
+    <div className="game-container enhanced">
       {/* Header with game info */}
       <div className="game-header">
         <h1>🥊 連勝競技系統</h1>
@@ -62,7 +72,7 @@ const GameContainer = () => {
 
       {/* Main game area */}
       <div className="game-main">
-        {/* Left panel - Arena and Controls */}
+        {/* Left panel - Enhanced Arena */}
         <div className="game-left">
           <GameArena 
             currentMatch={currentMatch}
@@ -70,6 +80,8 @@ const GameContainer = () => {
             canTakeRest={(playerName) => canPlayerRest(playerName)}
             onTakeRest={takeRest}
             isGameFinished={gameState.isGameFinished}
+            players={gameState.players}
+            nextPlayerInQueue={nextPlayerInQueue}
           />
           
           <GameControls
@@ -87,6 +99,7 @@ const GameContainer = () => {
           <PlayerQueue 
             players={gameState.players}
             currentMatch={currentMatch}
+            nextPlayerInQueue={nextPlayerInQueue}
           />
           
           <Scoreboard 
@@ -96,20 +109,12 @@ const GameContainer = () => {
         </div>
       </div>
 
-      {/* Bottom panel - History and Rules */}
+      {/* Bottom panel - History only (rules moved to setup) */}
       <div className="game-bottom">
-        <div className="game-bottom-left">
+        <div className="game-bottom-full">
           <GameHistory 
             history={gameState.gameHistory}
             players={gameState.players}
-          />
-        </div>
-        
-        <div className="game-bottom-right">
-          <GameRules 
-            playerCount={gameState.players.length}
-            restRequirement={gameState.restRequirement}
-            compact={true}
           />
         </div>
       </div>
