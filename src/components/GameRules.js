@@ -1,18 +1,47 @@
+/**
+ * Simplified Game Rules Component - Streak Tournament Only
+ * Clear display of streak tournament rules
+ */
+
 import React from 'react';
 import './GameRules.css';
 
-const GameRules = ({ playerCount = 4 }) => {
-  const requiredWins = playerCount - 1; // Dynamic win requirement
+const GameRules = ({ playerCount = 4, restRequirement = 3, compact = false }) => {
+  if (compact) {
+    return (
+      <div className="rules compact">
+        <h4 className="rules-title">📋 規則速覽</h4>
+        <div className="rules-compact-list">
+          <div className="rule-compact">
+            <span className="rule-icon">🏆</span>
+            <span>連勝 {restRequirement} 場可休息</span>
+          </div>
+          <div className="rule-compact">
+            <span className="rule-icon">⭐</span>
+            <span>休息獲得額外 1 分</span>
+          </div>
+          <div className="rule-compact">
+            <span className="rule-icon">🔄</span>
+            <span>勝者留場，敗者排隊</span>
+          </div>
+          <div className="rule-compact">
+            <span className="rule-icon">↶</span>
+            <span>支援無限撤銷</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rules">
-      <h3 className="rules-title">📋 比賽規則</h3>
+      <h3 className="rules-title">📋 連勝賽制規則</h3>
       <div className="rules-grid">
         <div className="rule-item">
           <div className="rule-icon">🥊</div>
           <div className="rule-content">
             <h4>比賽機制</h4>
-            <p>{playerCount}人循環一對一單挑，勝者留場，輸者下場排隊</p>
+            <p>{playerCount}人循環一對一單挑，勝者留場，敗者下場排隊</p>
           </div>
         </div>
         
@@ -27,12 +56,9 @@ const GameRules = ({ playerCount = 4 }) => {
         <div className="rule-item">
           <div className="rule-icon">🔥</div>
           <div className="rule-content">
-            <h4>連勝獎勵</h4>
+            <h4>連勝休息</h4>
             <p>
-              {playerCount >= 4 ? 
-                `連勝每 ${requiredWins} 場（${requiredWins}、${requiredWins * 2}、${requiredWins * 3}...）可選擇加 1 分下場` :
-                '人數少於4人時，不啟用連勝休息機制'
-              }
+              連勝 {restRequirement} 場（{restRequirement}、{restRequirement * 2}、{restRequirement * 3}...）可選擇休息並額外得 1 分
             </p>
           </div>
         </div>
@@ -40,8 +66,8 @@ const GameRules = ({ playerCount = 4 }) => {
         <div className="rule-item">
           <div className="rule-icon">🔄</div>
           <div className="rule-content">
-            <h4>下場機制</h4>
-            <p>選擇加分下場後排到隊伍末尾，很快會重新上場</p>
+            <h4>休息機制</h4>
+            <p>休息選手會重新排隊，當無其他選手時自動返場</p>
           </div>
         </div>
         
@@ -63,8 +89,8 @@ const GameRules = ({ playerCount = 4 }) => {
       </div>
       
       <div className="rules-footer">
-        <p>💡 提示：連勝 {requiredWins} 場表示已打贏所有對手一輪，可選擇加分下場！</p>
-        <p>🔄 選擇下場不會離開比賽，只是排到隊伍後面等候</p>
+        <p>💡 提示：連勝 {restRequirement} 場表示已打贏所有對手一輪，可選擇休息！</p>
+        <p>🔄 休息不會離開比賽，只是暫時排隊等候下一輪</p>
       </div>
     </div>
   );
