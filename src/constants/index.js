@@ -1,14 +1,16 @@
 /**
- * Application configuration constants - Simplified for Streak Tournament Only
+ * Application configuration constants - Enhanced with Rooms and Visual Flow
  */
 
-// App version - Updated for simplified version
+// App version - Enhanced version with rooms and visual flow
 export const APP_VERSION = 'v1.4.0';
 
-// App modes - Simplified to core functionality
+// App modes - Including room functionality
 export const APP_MODES = {
-  PLAYER_SETUP: 'player-setup',
-  GAME: 'game'
+  ROOM_BROWSER: 'room-browser',
+  PLAYER_SETUP: 'player-setup', 
+  GAME: 'game',
+  HISTORY: 'history'
 };
 
 // Status message types
@@ -33,6 +35,13 @@ export const STREAK_CONFIG = {
   getRestRequirement: (playerCount) => playerCount - 1,
   REST_BONUS_POINTS: 1,
   POINTS_PER_WIN: 1
+};
+
+// Firebase configuration
+export const FIREBASE_DEFAULTS = {
+  ROOM_CODE_LENGTH: 6,
+  MAX_ROOM_NAME_LENGTH: 50,
+  ROOM_EXPIRY_HOURS: 24
 };
 
 // UI configuration
