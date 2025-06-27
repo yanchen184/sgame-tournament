@@ -1,92 +1,31 @@
+/**
+ * Enhanced Room Browser - With Visual Flow Support
+ * Browse and join rooms with enhanced visual feedback
+ */
+
 import React, { useState, useEffect } from 'react';
 import './RoomBrowser.css';
-import { useFirebaseRoom } from '../hooks/useFirebaseGame';
+import { useGame } from '../contexts/GameContext';
+import { APP_MODES } from '../constants';
 
-const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => {
+const RoomBrowser = () => {
+  const { setMode, setStatus } = useGame();
   const [activeRooms, setActiveRooms] = useState([]);
   const [roomCode, setRoomCode] = useState('');
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
-  const [mode, setMode] = useState('browse'); // 'browse' or 'join' or 'create'
+  const [mode, setLocalMode] = useState('browse'); // 'browse' or 'join' or 'create'
   const [firebaseError, setFirebaseError] = useState(null);
-
-  const { getActiveRooms } = useFirebaseRoom(true);
 
   // Load active rooms initially
   useEffect(() => {
     loadActiveRooms();
   }, []);
 
-  // Set up real-time room list updates
-  useEffect(() => {
-    let unsubscribe = null;
-    
-    // Import gameService to set up real-time listener
-    import('../services/gameService').then(({ default: gameService }) => {
-      // Subscribe to real-time updates of the rooms collection
-      unsubscribe = gameService.subscribeToActiveRooms((rooms) => {
-        console.log('Real-time rooms update:', rooms);
-        setActiveRooms(rooms || []);
-        setIsLoadingRooms(false);
-      }, (error) => {
-        console.error('Failed to subscribe to room updates:', error);
-        setFirebaseError(error.message);
-        // Fallback to mock data
-        const mockRooms = [
-          {
-            id: 'DEMO01',
-            displayName: 'DEMO01',
-            roomCode: 'DEMO01',
-            playerCount: 4,
-            currentPlayers: ['Alice', 'Bob', 'Charlie', 'David'],
-            status: 'playing',
-            created: new Date(Date.now() - 15 * 60 * 1000),
-            lastActivity: new Date(Date.now() - 2 * 60 * 1000)
-          },
-          {
-            id: 'DEMO02',
-            displayName: 'DEMO02',
-            roomCode: 'DEMO02',
-            playerCount: 3,
-            currentPlayers: ['Emma', 'Frank', 'Grace'],
-            status: 'playing',
-            created: new Date(Date.now() - 45 * 60 * 1000),
-            lastActivity: new Date(Date.now() - 5 * 60 * 1000)
-          }
-        ];
-        setActiveRooms(mockRooms);
-        setIsLoadingRooms(false);
-      });
-    }).catch((error) => {
-      console.error('Failed to import gameService:', error);
-      loadActiveRooms(); // Fallback to manual loading
-    });
-
-    // Cleanup subscription on unmount
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
-
   const loadActiveRooms = async () => {
     setIsLoadingRooms(true);
     setFirebaseError(null);
     try {
-      console.log('Loading active rooms...');
-      const rooms = await getActiveRooms();
-      console.log('Loaded rooms:', rooms);
-      setActiveRooms(rooms || []);
-      
-      // If no rooms found and no Firebase error, show a message
-      if ((!rooms || rooms.length === 0) && !firebaseError) {
-        console.log('No active rooms found, possibly due to Firebase config or empty database');
-      }
-    } catch (error) {
-      console.error('Failed to load active rooms:', error);
-      setFirebaseError(error.message);
-      
-      // Show mock data as fallback for demo purposes
+      // Mock data for demonstration
       const mockRooms = [
         {
           id: 'DEMO01',
@@ -95,8 +34,8 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
           playerCount: 4,
           currentPlayers: ['Alice', 'Bob', 'Charlie', 'David'],
           status: 'playing',
-          created: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-          lastActivity: new Date(Date.now() - 2 * 60 * 1000) // 2 minutes ago
+          created: new Date(Date.now() - 15 * 60 * 1000),
+          lastActivity: new Date(Date.now() - 2 * 60 * 1000)
         },
         {
           id: 'DEMO02',
@@ -105,12 +44,15 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
           playerCount: 3,
           currentPlayers: ['Emma', 'Frank', 'Grace'],
           status: 'playing',
-          created: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
-          lastActivity: new Date(Date.now() - 5 * 60 * 1000) // 5 minutes ago
+          created: new Date(Date.now() - 45 * 60 * 1000),
+          lastActivity: new Date(Date.now() - 5 * 60 * 1000)
         }
       ];
       setActiveRooms(mockRooms);
       console.log('Using mock room data for demo');
+    } catch (error) {
+      console.error('Failed to load active rooms:', error);
+      setFirebaseError(error.message);
     } finally {
       setIsLoadingRooms(false);
     }
@@ -118,12 +60,27 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
 
   const handleJoinByCode = () => {
     if (roomCode.trim()) {
-      onJoinRoom(roomCode.trim().toUpperCase());
+      // For demo, just go to player setup
+      setStatus('info', `嘗試加入房間: ${roomCode.trim().toUpperCase()}`);
+      setMode(APP_MODES.PLAYER_SETUP);
     }
   };
 
   const handleJoinRoom = (roomId) => {
-    onJoinRoom(roomId);
+    // For demo, just go to player setup
+    setStatus('info', `加入房間: ${roomId}`);
+    setMode(APP_MODES.PLAYER_SETUP);
+  };
+
+  const handleCreateRoom = () => {
+    // Go directly to player setup for creating a new room
+    setStatus('success', '創建新房間');
+    setMode(APP_MODES.PLAYER_SETUP);
+  };
+
+  const handleViewHistory = () => {
+    // Go to history mode
+    setMode(APP_MODES.HISTORY);
   };
 
   const formatTimeAgo = (date) => {
@@ -142,8 +99,8 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
 
   if (mode === 'create') {
     // 直接創建房間，不顯示說明頁面
-    onCreateRoom();
-    setMode('browse'); // 返回瀏覽模式
+    handleCreateRoom();
+    setLocalMode('browse'); // 返回瀏覽模式
     return null;
   }
 
@@ -153,7 +110,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
         <div className="room-browser-header">
           <button 
             className="back-btn"
-            onClick={() => setMode('browse')}
+            onClick={() => setLocalMode('browse')}
           >
             ← 返回
           </button>
@@ -176,9 +133,9 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
               />
               <button 
                 onClick={handleJoinByCode}
-                disabled={!roomCode.trim() || isLoading}
+                disabled={!roomCode.trim()}
               >
-                {isLoading ? '加入中...' : '加入房間'}
+                加入房間
               </button>
             </div>
             
@@ -205,7 +162,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
           <span className="live-indicator">🔴 即時更新</span>
           <button 
             className="history-btn"
-            onClick={onViewHistory}
+            onClick={handleViewHistory}
           >
             📈 歷史統計
           </button>
@@ -231,14 +188,14 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
       <div className="room-actions">
         <button 
           className="action-btn create-btn"
-          onClick={() => setMode('create')}
+          onClick={() => setLocalMode('create')}
         >
           🎮 創建新房間
         </button>
         
         <button 
           className="action-btn join-btn"
-          onClick={() => setMode('join')}
+          onClick={() => setLocalMode('join')}
         >
           🔗 輸入房間號加入
         </button>
@@ -263,7 +220,7 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
             )}
             <button 
               className="empty-create-btn"
-              onClick={() => setMode('create')}
+              onClick={() => setLocalMode('create')}
             >
               🎮 立即創建房間
             </button>
@@ -306,9 +263,8 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
                 <button 
                   className="join-room-btn"
                   onClick={() => handleJoinRoom(room.roomCode || room.id)}
-                  disabled={isLoading}
                 >
-                  {isLoading ? '加入中...' : '🎮 加入比賽'}
+                  🎮 加入比賽
                 </button>
               </div>
             ))}
@@ -341,10 +297,10 @@ const RoomBrowser = ({ onJoinRoom, onCreateRoom, onViewHistory, isLoading }) => 
             </div>
           </div>
           <div className="tip-item">
-            <span className="tip-icon">👀</span>
+            <span className="tip-icon">👁️</span>
             <div>
-              <strong>加入比賽</strong>
-              <p>加入他人房間，大家一起參與比賽進行</p>
+              <strong>視覺化流程</strong>
+              <p>懸停選手可預覽勝負結果，點擊宣布勝利</p>
             </div>
           </div>
         </div>
