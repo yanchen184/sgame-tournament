@@ -1,187 +1,177 @@
-import React, { useState } from 'react';
+/**
+ * Simplified Player Setup Component - Streak Tournament Only
+ * Clean interface for setting up players and starting streak tournament
+ */
+
+import React, { useState, useEffect } from 'react';
+import { useGame } from '../contexts/GameContext';
+import { GAME_DEFAULTS } from '../constants';
 import './PlayerSetup.css';
 
-const PlayerSetup = ({ onSetupPlayers, initialNames, onBack, isMultiplayer, roomCode, isRoomHost, roomConnected }) => {
-  const [playerCount, setPlayerCount] = useState(4); // Default 4 players
-  const [playerNames, setPlayerNames] = useState(() => {
-    // Initialize with default names based on player count
-    const defaultNames = ['bob', 'jimmy', 'white', 'dada', 'alex', 'sam', 'chris', 'taylor'];
-    return Array.from({ length: 8 }, (_, i) => {
-      if (initialNames && initialNames[i]) {
-        return initialNames[i];
-      }
-      return defaultNames[i] || `選手${i + 1}`;
-    });
-  });
-  const [gameStarted, setGameStarted] = useState(false);
+/**
+ * Player setup component for configuring tournament participants
+ */
+const PlayerSetup = () => {
+  const { 
+    playerCount, 
+    playerNames, 
+    setPlayerCount, 
+    setPlayerNames, 
+    startGame,
+    setStatus
+  } = useGame();
 
-  // Validate form
-  const isValid = () => {
-    // 檢查是否所有必要的選手名字都已填寫
-    const requiredNames = playerNames.slice(0, playerCount);
-    return requiredNames.every(name => name && name.trim().length > 0);
-  };
+  const [localPlayerNames, setLocalPlayerNames] = useState([...playerNames]);
+
+  // Sync with global state
+  useEffect(() => {
+    setLocalPlayerNames([...playerNames]);
+  }, [playerNames]);
 
   // Handle player count change
-  const handlePlayerCountChange = (count) => {
-    setPlayerCount(count);
+  const handlePlayerCountChange = (newCount) => {
+    setPlayerCount(newCount);
   };
 
   // Handle player name change
-  const handleNameChange = (index, name) => {
-    const newNames = [...playerNames];
+  const handlePlayerNameChange = (index, name) => {
+    const newNames = [...localPlayerNames];
     newNames[index] = name;
+    setLocalPlayerNames(newNames);
     setPlayerNames(newNames);
   };
 
-  // Generate random names for current player count
+  // Generate random names
   const generateRandomNames = () => {
     const randomNames = [
-      'Alex', 'Sam', 'Chris', 'Taylor', 'Jordan', 'Casey', 'Morgan', 'Avery',
-      'Blake', 'Drew', 'Emery', 'Finley', 'Harper', 'Indigo', 'Jamie', 'Kai',
-      'Lane', 'Max', 'Nova', 'Oakley', 'Phoenix', 'Quinn', 'River', 'Sage'
+      '武士阿萬', '劍客阿強', '忍者阿華', '拳手阿明',
+      '刀客阿傑', '格鬥阿豪', '戰士阿勇', '英雄阿偉'
     ];
     
-    const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
-    const newNames = [...playerNames];
-    
+    const newNames = [];
     for (let i = 0; i < playerCount; i++) {
-      newNames[i] = shuffled[i] || `選手${i + 1}`;
+      newNames.push(randomNames[i] || `選手${String.fromCharCode(65 + i)}`);
     }
     
+    setLocalPlayerNames(newNames);
     setPlayerNames(newNames);
   };
 
-  // Start game with selected players
-  const startGame = () => {
-    const selectedNames = playerNames.slice(0, playerCount).filter(name => name.trim());
+  // Validate and start game
+  const handleStartGame = () => {
+    // Validate player names
+    const validNames = localPlayerNames.filter(name => name.trim().length > 0);
     
-    if (selectedNames.length !== playerCount) {
-      alert(`請填入 ${playerCount} 位選手的名字！`);
+    if (validNames.length < GAME_DEFAULTS.MIN_PLAYER_COUNT) {
+      setStatus('error', `至少需要 ${GAME_DEFAULTS.MIN_PLAYER_COUNT} 位選手`);
       return;
     }
 
-    setGameStarted(true);
-    onSetupPlayers(selectedNames, playerCount);
+    if (validNames.length !== playerCount) {
+      setStatus('error', '請確保所有選手都有名稱');
+      return;
+    }
+
+    // Check for duplicate names
+    const uniqueNames = new Set(validNames.map(name => name.trim()));
+    if (uniqueNames.size !== validNames.length) {
+      setStatus('error', '選手名稱不能重複');
+      return;
+    }
+
+    // Start the game
+    startGame(validNames.map(name => name.trim()));
   };
 
-  if (gameStarted) {
-    return (
-      <div className="setup-container">
-        <div className="loading-animation">
-          <div className="loading-spinner"></div>
-          <h2>🎮 正在準備比賽...</h2>
-        </div>
-      </div>
-    );
-  }
+  const restRequirement = playerCount - 1;
 
   return (
-    <div className="setup-container">
-      <div className="setup-card">
-        <button 
-          className="back-btn floating"
-          onClick={onBack}
-        >
-          ⬅️ 返回
-        </button>
-        
+    <div className="player-setup">
+      <div className="setup-container">
+        {/* Header */}
         <div className="setup-header">
-          <h1 className="setup-title">🥊 設置比賽</h1>
-          <p className="setup-subtitle">自定義參賽人數和選手名稱</p>
-          
-          {/* 顯示房間資訊 */}
-          {isMultiplayer && (
-            <div className="room-info">
-              {roomCode ? (
-                <div className="room-code-display">
-                  <h3>🏠 房間號碼</h3>
-                  <div className="room-code">{roomCode}</div>
-                  <p className="room-status">
-                    {roomConnected ? (
-                      <>🔥 Firebase 已連接</>
-                    ) : (
-                      <>⏳ 連接中...</>
-                    )}
-                  </p>
-                  <p className="room-hint">分享此號碼讓朋友加入觀戰</p>
-                </div>
-              ) : (
-                <div className="room-creating">
-                  <p>🎮 準備創建多人房間...</p>
-                </div>
-              )}
-            </div>
-          )}
+          <h1>🥊 連勝競技系統</h1>
+          <p>設置選手並開始連勝賽制比賽</p>
         </div>
 
-        {/* Player Count Selection */}
+        {/* Player count selection */}
         <div className="player-count-section">
-          <h3>👥 參賽人數</h3>
-          <div className="count-buttons">
-            {[3, 4, 5, 6, 7, 8].map(count => (
-              <button
-                key={count}
-                className={`count-btn ${playerCount === count ? 'active' : ''}`}
-                onClick={() => handlePlayerCountChange(count)}
-              >
-                {count} 人
-              </button>
-            ))}
-          </div>
-          <div className="count-info">
-            <p>連勝 <strong>{playerCount - 1}</strong> 場（打滿一輪）可選擇休息 +1 分</p>
+          <h3>選擇參賽人數</h3>
+          <div className="player-count-buttons">
+            {Array.from({ length: GAME_DEFAULTS.MAX_PLAYER_COUNT - GAME_DEFAULTS.MIN_PLAYER_COUNT + 1 }, (_, i) => {
+              const count = GAME_DEFAULTS.MIN_PLAYER_COUNT + i;
+              return (
+                <button
+                  key={count}
+                  className={`count-btn ${playerCount === count ? 'active' : ''}`}
+                  onClick={() => handlePlayerCountChange(count)}
+                >
+                  {count}人
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Player Names Input */}
-        <div className="player-names-section">
-          <h3>👤 選手名稱</h3>
-          <div className="name-inputs">
-            {[...Array(playerCount)].map((_, index) => (
-              <div key={index} className="name-input-group">
-                <label>選手 {index + 1}</label>
-                <input
-                  type="text"
-                  value={playerNames[index] || ''}
-                  onChange={(e) => handleNameChange(index, e.target.value)}
-                  placeholder={`選手 ${index + 1}`}
-                />
-              </div>
-            ))}
+        {/* Game rules preview */}
+        <div className="rules-preview">
+          <h4>連勝規則預覽</h4>
+          <div className="rules-info">
+            <span>🏆 連勝 {restRequirement} 場可選擇休息</span>
+            <span>⭐ 休息可獲得額外 1 分</span>
+            <span>🔄 勝者留場，敗者排隊</span>
+            <span>↶ 支援無限撤銷操作</span>
           </div>
-          
-          <div className="name-actions">
+        </div>
+
+        {/* Player names input */}
+        <div className="player-names-section">
+          <div className="names-header">
+            <h3>選手名稱設置</h3>
             <button 
-              className="random-names-btn" 
+              className="random-btn"
               onClick={generateRandomNames}
               type="button"
             >
               🎲 隨機名稱
             </button>
           </div>
+          
+          <div className="player-inputs">
+            {Array.from({ length: playerCount }, (_, index) => (
+              <div key={index} className="player-input-group">
+                <label htmlFor={`player-${index}`}>
+                  選手 {index + 1}
+                </label>
+                <input
+                  id={`player-${index}`}
+                  type="text"
+                  value={localPlayerNames[index] || ''}
+                  onChange={(e) => handlePlayerNameChange(index, e.target.value)}
+                  placeholder={`輸入選手 ${index + 1} 的名稱`}
+                  maxLength={20}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Start Game Button */}
-        <div className="setup-actions">
+        {/* Start game button */}
+        <div className="start-section">
           <button 
-            className="start-btn" 
-            onClick={startGame}
-            disabled={!isValid()}
+            className="start-btn"
+            onClick={handleStartGame}
           >
-            開始比賽 🎮
+            🚀 開始比賽
           </button>
         </div>
 
-        {/* Game Rules Preview */}
-        <div className="rules-preview">
-          <h4>📋 比賽規則預覽</h4>
-          <ul>
-            <li>🥊 {playerCount} 人循環單挑賽制</li>
-            <li>🔥 連勝 {playerCount - 1} 場可選擇休息並獲得 +1 分</li>
-            <li>↶ 支援無限撤銷操作</li>
-            <li>📱 針對手機使用優化</li>
-          </ul>
+        {/* Info footer */}
+        <div className="setup-footer">
+          <p>
+            ℹ️ {playerCount} 人比賽：連勝 {restRequirement} 場可休息 
+            • 每場勝利得 1 分 • 休息額外得 1 分
+          </p>
         </div>
       </div>
     </div>

@@ -1,497 +1,358 @@
+/**
+ * Simplified Game Context - Streak Tournament Only
+ * Provides game state management focused on streak-based gameplay
+ */
+
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
-import { 
-  shuffleArray, 
-  createInitialPlayers,
-  findNextChallenger,
-  setupMatchBetweenOthers,
-  createMatchResult
-} from '../utils/gameUtils';
+import { StreakGameEngine } from '../gameEngines/StreakGameEngine';
+import { APP_MODES, GAME_DEFAULTS, STATUS_TYPES } from '../constants';
 
-// Game state constants
-export const APP_MODES = {
-  ROOM_BROWSER: 'room-browser',
-  PLAYER_SETUP: 'player-setup',
-  GAME: 'game',
-  HISTORY: 'history'
-};
-
-// Action types
-export const GAME_ACTIONS = {
-  SET_APP_MODE: 'SET_APP_MODE',
-  SET_MULTIPLAYER: 'SET_MULTIPLAYER',
-  SET_JOINING_ROOM: 'SET_JOINING_ROOM',
-  SETUP_PLAYERS: 'SETUP_PLAYERS',
-  START_GAME: 'START_GAME',
-  SET_CURRENT_FIGHTERS: 'SET_CURRENT_FIGHTERS',
-  DECLARE_WINNER: 'DECLARE_WINNER',
-  SET_SHOW_REST_OPTION: 'SET_SHOW_REST_OPTION',
-  TAKE_REST: 'TAKE_REST',
-  CONTINUE_PLAY: 'CONTINUE_PLAY',
-  END_GAME: 'END_GAME',
-  SET_SHOW_HISTORY: 'SET_SHOW_HISTORY',
-  SET_STATUS_MESSAGE: 'SET_STATUS_MESSAGE',
-  CLEAR_STATUS_MESSAGE: 'CLEAR_STATUS_MESSAGE',
-  SAVE_STATE_TO_UNDO: 'SAVE_STATE_TO_UNDO',
-  UNDO_LAST_ACTION: 'UNDO_LAST_ACTION',
-  SYNC_REALTIME_DATA: 'SYNC_REALTIME_DATA',
-  RESET_GAME: 'RESET_GAME'
-};
+// Game Context
+const GameContext = createContext();
 
 // Initial state
 const initialState = {
-  // App mode
-  appMode: APP_MODES.ROOM_BROWSER,
+  // App mode management
+  currentMode: APP_MODES.PLAYER_SETUP,
   
-  // Room state
-  isMultiplayer: false,
-  isJoiningRoom: false,
-  
-  // Game setup
-  gameSetup: false,
-  playerCount: 4,
-  playerNames: ['bob', 'jimmy', 'white', 'dada'],
+  // Player management
+  playerCount: GAME_DEFAULTS.DEFAULT_PLAYER_COUNT,
+  playerNames: [...GAME_DEFAULTS.DEFAULT_PLAYER_NAMES.slice(0, GAME_DEFAULTS.DEFAULT_PLAYER_COUNT)],
   
   // Game state
-  players: [],
-  currentFighters: [null, null],
-  gameStarted: false,
-  gameEnded: false,
-  battleCount: 0,
-  gameHistory: [],
-  
-  // Champion tracking
-  currentChampion: null,
-  championBeatenOpponents: [],
-  
-  // Rest system
-  showRestOption: false,
-  streakWinner: null,
+  gameEngine: null,
+  gameState: null,
   
   // UI state
-  showHistory: false,
   statusMessage: null,
+  isProcessing: false,
   
-  // Animation state
-  showTransition: false,
-  transitionData: null,
-  transitionType: null,
-  isTransitioning: false,
-  
-  // Undo system
-  undoStack: []
-};
-
-// Game reducer
-const gameReducer = (state, action) => {
-  switch (action.type) {
-    case GAME_ACTIONS.SET_APP_MODE:
-      return { ...state, appMode: action.payload };
-      
-    case GAME_ACTIONS.SET_MULTIPLAYER:
-      return { ...state, isMultiplayer: action.payload };
-      
-    case GAME_ACTIONS.SET_JOINING_ROOM:
-      return { ...state, isJoiningRoom: action.payload };
-      
-    case GAME_ACTIONS.SETUP_PLAYERS: {
-      const { names, count } = action.payload;
-      const initialPlayers = createInitialPlayers(names, count);
-      const shuffledPlayers = shuffleArray(initialPlayers).map((player, index) => ({
-        ...player,
-        position: index
-      }));
-      
-      return {
-        ...state,
-        playerCount: count,
-        playerNames: names,
-        players: shuffledPlayers,
-        gameSetup: true,
-        gameStarted: true,
-        gameEnded: false,
-        currentChampion: shuffledPlayers[0],
-        championBeatenOpponents: [],
-        currentFighters: [shuffledPlayers[0], shuffledPlayers[1]],
-        battleCount: 0,
-        gameHistory: [],
-        undoStack: []
-      };
-    }
-    
-    case GAME_ACTIONS.SET_CURRENT_FIGHTERS:
-      return { ...state, currentFighters: action.payload };
-      
-    case GAME_ACTIONS.DECLARE_WINNER: {
-      const { winnerName } = action.payload;
-      const winner = state.currentFighters.find(fighter => fighter.name === winnerName);
-      const loser = state.currentFighters.find(fighter => fighter.name !== winnerName);
-      
-      if (!winner || !loser) return state;
-      
-      // Update players
-      const updatedPlayers = state.players.map(player => {
-        if (player.id === winner.id) {
-          return {
-            ...player,
-            score: player.score + 1,
-            winStreak: player.winStreak + 1
-          };
-        } else if (player.id === loser.id) {
-          return { ...player, winStreak: 0 };
-        }
-        return player;
-      });
-      
-      // Create match result
-      const matchResult = createMatchResult(
-        state.battleCount + 1,
-        winner,
-        loser,
-        updatedPlayers.find(p => p.id === winner.id).score
-      );
-      
-      // Champion tracking logic
-      let newChampion = updatedPlayers.find(p => p.id === winner.id);
-      let newBeatenOpponents = [...state.championBeatenOpponents];
-      let shouldShowRest = false;
-      let newCurrentFighters = state.currentFighters;
-      
-      // If winner was already the champion, continue their streak
-      if (winner.id === state.currentChampion?.id) {
-        if (!newBeatenOpponents.some(op => op.id === loser.id)) {
-          newBeatenOpponents.push(loser);
-        }
-      } else {
-        // New champion takes over - reset beaten opponents list
-        newBeatenOpponents = [loser];
-      }
-      
-      // Check if champion has beaten all other players (only for 4+ players)
-      const otherPlayers = updatedPlayers.filter(p => p.id !== winner.id);
-      const hasBeatenAll = otherPlayers.every(player => 
-        newBeatenOpponents.some(beaten => beaten.id === player.id)
-      );
-      
-      if (hasBeatenAll && state.playerCount >= 4) {
-        shouldShowRest = true;
-      } else {
-        // Find next challenger for the champion
-        const nextChallenger = findNextChallenger(updatedPlayers, newChampion, newBeatenOpponents);
-        if (nextChallenger) {
-          const winnerIndex = state.currentFighters.findIndex(f => f.id === winner.id);
-          const loserIndex = state.currentFighters.findIndex(f => f.id === loser.id);
-          
-          newCurrentFighters = [...state.currentFighters];
-          newCurrentFighters[loserIndex] = nextChallenger;
-        } else {
-          // No more challengers, should end game
-          return {
-            ...state,
-            players: updatedPlayers,
-            battleCount: state.battleCount + 1,
-            gameHistory: [...state.gameHistory, matchResult],
-            gameEnded: true,
-            gameStarted: false
-          };
-        }
-      }
-      
-      return {
-        ...state,
-        players: updatedPlayers,
-        battleCount: state.battleCount + 1,
-        gameHistory: [...state.gameHistory, matchResult],
-        currentChampion: newChampion,
-        championBeatenOpponents: newBeatenOpponents,
-        currentFighters: shouldShowRest ? state.currentFighters : newCurrentFighters,
-        showRestOption: shouldShowRest,
-        streakWinner: shouldShowRest ? newChampion : null
-      };
-    }
-    
-    case GAME_ACTIONS.TAKE_REST: {
-      if (!state.streakWinner) return state;
-      
-      const updatedPlayers = state.players.map(player => {
-        if (player.id === state.streakWinner.id) {
-          return { 
-            ...player, 
-            score: player.score + 1,
-            winStreak: 0
-          };
-        }
-        return player;
-      });
-      
-      const restRecord = createMatchResult(
-        state.battleCount + 1,
-        state.streakWinner,
-        null,
-        null,
-        'rest'
-      );
-      
-      const restedChampionId = state.streakWinner.id;
-      const newCurrentFighters = setupMatchBetweenOthers(
-        updatedPlayers, 
-        restedChampionId, 
-        state.championBeatenOpponents
-      );
-      
-      if (!newCurrentFighters) {
-        // Cannot setup new match, end game
-        return {
-          ...state,
-          gameEnded: true,
-          gameStarted: false
-        };
-      }
-      
-      return {
-        ...state,
-        players: updatedPlayers,
-        battleCount: state.battleCount + 1,
-        gameHistory: [...state.gameHistory, restRecord],
-        currentFighters: newCurrentFighters,
-        currentChampion: newCurrentFighters[0],
-        championBeatenOpponents: [],
-        showRestOption: false,
-        streakWinner: null
-      };
-    }
-    
-    case GAME_ACTIONS.CONTINUE_PLAY: {
-      if (!state.streakWinner) return state;
-      
-      const champion = state.streakWinner;
-      const nextChallenger = findNextChallenger(state.players, champion, []);
-      
-      if (!nextChallenger) {
-        return {
-          ...state,
-          gameEnded: true,
-          gameStarted: false
-        };
-      }
-      
-      return {
-        ...state,
-        currentFighters: [champion, nextChallenger],
-        currentChampion: champion,
-        championBeatenOpponents: [],
-        showRestOption: false,
-        streakWinner: null
-      };
-    }
-    
-    case GAME_ACTIONS.END_GAME: {
-      const finalRankedPlayers = [...state.players].sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return b.winStreak - a.winStreak;
-      });
-      
-      const finalRecord = createMatchResult(
-        state.battleCount + 1,
-        finalRankedPlayers[0],
-        null,
-        null,
-        'final'
-      );
-      
-      return {
-        ...state,
-        players: finalRankedPlayers,
-        battleCount: state.battleCount + 1,
-        gameHistory: [...state.gameHistory, finalRecord],
-        gameEnded: true,
-        gameStarted: false,
-        showRestOption: false,
-        streakWinner: null,
-        currentChampion: null,
-        championBeatenOpponents: []
-      };
-    }
-    
-    case GAME_ACTIONS.SET_SHOW_HISTORY:
-      return { ...state, showHistory: action.payload };
-      
-    case GAME_ACTIONS.SET_STATUS_MESSAGE:
-      return { ...state, statusMessage: action.payload };
-      
-    case GAME_ACTIONS.CLEAR_STATUS_MESSAGE:
-      return { ...state, statusMessage: null };
-      
-    case GAME_ACTIONS.SAVE_STATE_TO_UNDO: {
-      const currentState = {
-        players: [...state.players],
-        currentFighters: [...state.currentFighters],
-        battleCount: state.battleCount,
-        gameHistory: [...state.gameHistory],
-        showRestOption: state.showRestOption,
-        streakWinner: state.streakWinner,
-        currentChampion: state.currentChampion,
-        championBeatenOpponents: [...state.championBeatenOpponents]
-      };
-      
-      return {
-        ...state,
-        undoStack: [...state.undoStack, currentState]
-      };
-    }
-    
-    case GAME_ACTIONS.UNDO_LAST_ACTION: {
-      if (state.undoStack.length === 0) return state;
-      
-      const lastState = state.undoStack[state.undoStack.length - 1];
-      return {
-        ...state,
-        players: lastState.players,
-        currentFighters: lastState.currentFighters,
-        battleCount: lastState.battleCount,
-        gameHistory: lastState.gameHistory,
-        showRestOption: lastState.showRestOption,
-        streakWinner: lastState.streakWinner,
-        currentChampion: lastState.currentChampion,
-        championBeatenOpponents: lastState.championBeatenOpponents,
-        undoStack: state.undoStack.slice(0, -1)
-      };
-    }
-    
-    case GAME_ACTIONS.SYNC_REALTIME_DATA: {
-      const { realtimeGameData } = action.payload;
-      return {
-        ...state,
-        ...realtimeGameData
-      };
-    }
-    
-    case GAME_ACTIONS.RESET_GAME:
-      return {
-        ...initialState,
-        appMode: APP_MODES.ROOM_BROWSER
-      };
-      
-    default:
-      return state;
+  // Game settings
+  settings: {
+    enableFirebase: false,
+    autoSave: true
   }
 };
 
-// Create context
-const GameContext = createContext();
+// Action types
+const ActionTypes = {
+  SET_MODE: 'SET_MODE',
+  SET_PLAYER_COUNT: 'SET_PLAYER_COUNT',
+  SET_PLAYER_NAMES: 'SET_PLAYER_NAMES',
+  START_GAME: 'START_GAME',
+  DECLARE_WINNER: 'DECLARE_WINNER',
+  TAKE_REST: 'TAKE_REST',
+  UNDO_ACTION: 'UNDO_ACTION',
+  RESET_GAME: 'RESET_GAME',
+  END_GAME: 'END_GAME',
+  SET_STATUS: 'SET_STATUS',
+  CLEAR_STATUS: 'CLEAR_STATUS',
+  SET_PROCESSING: 'SET_PROCESSING',
+  UPDATE_SETTINGS: 'UPDATE_SETTINGS'
+};
 
-// Game provider component
-export const GameProvider = ({ children }) => {
+// Reducer
+function gameReducer(state, action) {
+  switch (action.type) {
+    case ActionTypes.SET_MODE:
+      return {
+        ...state,
+        currentMode: action.payload
+      };
+
+    case ActionTypes.SET_PLAYER_COUNT:
+      const newCount = action.payload;
+      const newNames = [...GAME_DEFAULTS.DEFAULT_PLAYER_NAMES.slice(0, newCount)];
+      // If we have existing names, preserve them
+      if (state.playerNames.length > 0) {
+        for (let i = 0; i < Math.min(newCount, state.playerNames.length); i++) {
+          if (state.playerNames[i].trim()) {
+            newNames[i] = state.playerNames[i];
+          }
+        }
+      }
+      
+      return {
+        ...state,
+        playerCount: newCount,
+        playerNames: newNames
+      };
+
+    case ActionTypes.SET_PLAYER_NAMES:
+      return {
+        ...state,
+        playerNames: action.payload
+      };
+
+    case ActionTypes.START_GAME:
+      const gameEngine = new StreakGameEngine(action.payload.playerNames);
+      return {
+        ...state,
+        gameEngine,
+        gameState: gameEngine.getGameState(),
+        currentMode: APP_MODES.GAME
+      };
+
+    case ActionTypes.DECLARE_WINNER:
+      if (!state.gameEngine) return state;
+      
+      try {
+        const result = state.gameEngine.declareWinner(action.payload.winnerName);
+        return {
+          ...state,
+          gameState: state.gameEngine.getGameState(),
+          statusMessage: {
+            type: STATUS_TYPES.SUCCESS,
+            message: `${result.winner.name} 獲勝！${result.canTakeRest ? ' (可選擇休息)' : ''}`,
+            timestamp: Date.now()
+          }
+        };
+      } catch (error) {
+        return {
+          ...state,
+          statusMessage: {
+            type: STATUS_TYPES.ERROR,
+            message: `錯誤：${error.message}`,
+            timestamp: Date.now()
+          }
+        };
+      }
+
+    case ActionTypes.TAKE_REST:
+      if (!state.gameEngine) return state;
+      
+      try {
+        state.gameEngine.takeRest(action.payload.playerName);
+        return {
+          ...state,
+          gameState: state.gameEngine.getGameState(),
+          statusMessage: {
+            type: STATUS_TYPES.INFO,
+            message: `${action.payload.playerName} 選擇休息，獲得額外積分！`,
+            timestamp: Date.now()
+          }
+        };
+      } catch (error) {
+        return {
+          ...state,
+          statusMessage: {
+            type: STATUS_TYPES.ERROR,
+            message: `無法休息：${error.message}`,
+            timestamp: Date.now()
+          }
+        };
+      }
+
+    case ActionTypes.UNDO_ACTION:
+      if (!state.gameEngine) return state;
+      
+      try {
+        const undoneAction = state.gameEngine.undoLastAction();
+        return {
+          ...state,
+          gameState: state.gameEngine.getGameState(),
+          statusMessage: {
+            type: STATUS_TYPES.INFO,
+            message: `已撤銷：${undoneAction.winner ? `${undoneAction.winner} 的勝利` : undoneAction.action}`,
+            timestamp: Date.now()
+          }
+        };
+      } catch (error) {
+        return {
+          ...state,
+          statusMessage: {
+            type: STATUS_TYPES.WARNING,
+            message: `無法撤銷：${error.message}`,
+            timestamp: Date.now()
+          }
+        };
+      }
+
+    case ActionTypes.RESET_GAME:
+      if (state.gameEngine) {
+        state.gameEngine.resetGame();
+      }
+      return {
+        ...state,
+        gameState: state.gameEngine ? state.gameEngine.getGameState() : null,
+        statusMessage: {
+          type: STATUS_TYPES.INFO,
+          message: '遊戲已重置',
+          timestamp: Date.now()
+        }
+      };
+
+    case ActionTypes.END_GAME:
+      if (state.gameEngine) {
+        state.gameEngine.endGame();
+      }
+      return {
+        ...state,
+        gameState: state.gameEngine ? state.gameEngine.getGameState() : null,
+        statusMessage: {
+          type: STATUS_TYPES.SUCCESS,
+          message: '遊戲結束！查看最終排名',
+          timestamp: Date.now()
+        }
+      };
+
+    case ActionTypes.SET_STATUS:
+      return {
+        ...state,
+        statusMessage: {
+          ...action.payload,
+          timestamp: Date.now()
+        }
+      };
+
+    case ActionTypes.CLEAR_STATUS:
+      return {
+        ...state,
+        statusMessage: null
+      };
+
+    case ActionTypes.SET_PROCESSING:
+      return {
+        ...state,
+        isProcessing: action.payload
+      };
+
+    case ActionTypes.UPDATE_SETTINGS:
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          ...action.payload
+        }
+      };
+
+    default:
+      return state;
+  }
+}
+
+// Provider component
+export function GameProvider({ children }) {
   const [state, dispatch] = useReducer(gameReducer, initialState);
-  
-  // Action creators
-  const setAppMode = useCallback((mode) => {
-    dispatch({ type: GAME_ACTIONS.SET_APP_MODE, payload: mode });
+
+  // Actions
+  const setMode = useCallback((mode) => {
+    dispatch({ type: ActionTypes.SET_MODE, payload: mode });
   }, []);
-  
-  const setMultiplayer = useCallback((isMultiplayer) => {
-    dispatch({ type: GAME_ACTIONS.SET_MULTIPLAYER, payload: isMultiplayer });
-  }, []);
-  
-  const setJoiningRoom = useCallback((isJoining) => {
-    dispatch({ type: GAME_ACTIONS.SET_JOINING_ROOM, payload: isJoining });
-  }, []);
-  
-  const setupPlayers = useCallback((names, count) => {
-    dispatch({ type: GAME_ACTIONS.SETUP_PLAYERS, payload: { names, count } });
-  }, []);
-  
-  const setCurrentFighters = useCallback((fighters) => {
-    dispatch({ type: GAME_ACTIONS.SET_CURRENT_FIGHTERS, payload: fighters });
-  }, []);
-  
-  const declareWinnerByName = useCallback((winnerName) => {
-    // Save state to undo stack before making changes
-    dispatch({ type: GAME_ACTIONS.SAVE_STATE_TO_UNDO });
-    dispatch({ type: GAME_ACTIONS.DECLARE_WINNER, payload: { winnerName } });
-  }, []);
-  
-  const takeRest = useCallback(() => {
-    dispatch({ type: GAME_ACTIONS.SAVE_STATE_TO_UNDO });
-    dispatch({ type: GAME_ACTIONS.TAKE_REST });
-  }, []);
-  
-  const continuePlay = useCallback(() => {
-    dispatch({ type: GAME_ACTIONS.CONTINUE_PLAY });
-  }, []);
-  
-  const endGame = useCallback(() => {
-    dispatch({ type: GAME_ACTIONS.END_GAME });
-  }, []);
-  
-  const setShowHistory = useCallback((show) => {
-    dispatch({ type: GAME_ACTIONS.SET_SHOW_HISTORY, payload: show });
-  }, []);
-  
-  const showStatus = useCallback((message, type = 'info', persistent = false) => {
-    dispatch({ 
-      type: GAME_ACTIONS.SET_STATUS_MESSAGE, 
-      payload: { message, type, persistent } 
-    });
-    
-    if (!persistent) {
-      setTimeout(() => {
-        dispatch({ type: GAME_ACTIONS.CLEAR_STATUS_MESSAGE });
-      }, 5000);
+
+  const setPlayerCount = useCallback((count) => {
+    if (count >= GAME_DEFAULTS.MIN_PLAYER_COUNT && count <= GAME_DEFAULTS.MAX_PLAYER_COUNT) {
+      dispatch({ type: ActionTypes.SET_PLAYER_COUNT, payload: count });
     }
   }, []);
-  
-  const clearStatus = useCallback(() => {
-    dispatch({ type: GAME_ACTIONS.CLEAR_STATUS_MESSAGE });
+
+  const setPlayerNames = useCallback((names) => {
+    dispatch({ type: ActionTypes.SET_PLAYER_NAMES, payload: names });
   }, []);
-  
+
+  const startGame = useCallback((playerNames) => {
+    if (!playerNames || playerNames.length < GAME_DEFAULTS.MIN_PLAYER_COUNT) {
+      dispatch({
+        type: ActionTypes.SET_STATUS,
+        payload: {
+          type: STATUS_TYPES.ERROR,
+          message: `至少需要 ${GAME_DEFAULTS.MIN_PLAYER_COUNT} 位選手`
+        }
+      });
+      return;
+    }
+
+    dispatch({ type: ActionTypes.START_GAME, payload: { playerNames } });
+  }, []);
+
+  const declareWinner = useCallback((winnerName) => {
+    dispatch({ type: ActionTypes.DECLARE_WINNER, payload: { winnerName } });
+  }, []);
+
+  const takeRest = useCallback((playerName) => {
+    dispatch({ type: ActionTypes.TAKE_REST, payload: { playerName } });
+  }, []);
+
   const undoLastAction = useCallback(() => {
-    dispatch({ type: GAME_ACTIONS.UNDO_LAST_ACTION });
+    dispatch({ type: ActionTypes.UNDO_ACTION });
   }, []);
-  
-  const syncRealtimeData = useCallback((realtimeGameData) => {
-    dispatch({ type: GAME_ACTIONS.SYNC_REALTIME_DATA, payload: { realtimeGameData } });
-  }, []);
-  
+
   const resetGame = useCallback(() => {
-    dispatch({ type: GAME_ACTIONS.RESET_GAME });
+    dispatch({ type: ActionTypes.RESET_GAME });
   }, []);
-  
-  const value = {
+
+  const endGame = useCallback(() => {
+    dispatch({ type: ActionTypes.END_GAME });
+  }, []);
+
+  const setStatus = useCallback((type, message) => {
+    dispatch({ type: ActionTypes.SET_STATUS, payload: { type, message } });
+  }, []);
+
+  const clearStatus = useCallback(() => {
+    dispatch({ type: ActionTypes.CLEAR_STATUS });
+  }, []);
+
+  const updateSettings = useCallback((newSettings) => {
+    dispatch({ type: ActionTypes.UPDATE_SETTINGS, payload: newSettings });
+  }, []);
+
+  // Helper functions
+  const getCurrentMatch = useCallback(() => {
+    return state.gameState?.currentMatch || null;
+  }, [state.gameState]);
+
+  const getLeaderboard = useCallback(() => {
+    return state.gameState?.leaderboard || [];
+  }, [state.gameState]);
+
+  const canPlayerRest = useCallback((playerName) => {
+    if (!state.gameState) return false;
+    const player = state.gameState.players.find(p => p.name === playerName);
+    return player && 
+           player.currentStreak >= state.gameState.restRequirement && 
+           player.currentStreak % state.gameState.restRequirement === 0;
+  }, [state.gameState]);
+
+  // Context value
+  const contextValue = {
     // State
     ...state,
     
     // Actions
-    setAppMode,
-    setMultiplayer,
-    setJoiningRoom,
-    setupPlayers,
-    setCurrentFighters,
-    declareWinnerByName,
+    setMode,
+    setPlayerCount,
+    setPlayerNames,
+    startGame,
+    declareWinner,
     takeRest,
-    continuePlay,
-    endGame,
-    setShowHistory,
-    showStatus,
-    clearStatus,
     undoLastAction,
-    syncRealtimeData,
-    resetGame
+    resetGame,
+    endGame,
+    setStatus,
+    clearStatus,
+    updateSettings,
+    
+    // Helpers
+    getCurrentMatch,
+    getLeaderboard,
+    canPlayerRest
   };
-  
+
   return (
-    <GameContext.Provider value={value}>
+    <GameContext.Provider value={contextValue}>
       {children}
     </GameContext.Provider>
   );
-};
+}
 
-// Hook to use game context
-export const useGame = () => {
+// Hook to use the game context
+export function useGame() {
   const context = useContext(GameContext);
   if (!context) {
     throw new Error('useGame must be used within a GameProvider');
   }
   return context;
-};
+}
 
 export default GameContext;
