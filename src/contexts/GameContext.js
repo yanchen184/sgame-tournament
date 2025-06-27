@@ -1,6 +1,6 @@
 /**
- * Simplified Game Context - Streak Tournament Only
- * Provides game state management focused on streak-based gameplay
+ * Enhanced Game Context - With Room Support and Visual Flow
+ * Provides game state management with room functionality and streak-based gameplay
  */
 
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
@@ -12,8 +12,8 @@ const GameContext = createContext();
 
 // Initial state
 const initialState = {
-  // App mode management
-  currentMode: APP_MODES.PLAYER_SETUP,
+  // App mode management - Start with room browser
+  currentMode: APP_MODES.ROOM_BROWSER,
   
   // Player management
   playerCount: GAME_DEFAULTS.DEFAULT_PLAYER_COUNT,
@@ -29,7 +29,7 @@ const initialState = {
   
   // Game settings
   settings: {
-    enableFirebase: false,
+    enableFirebase: true, // Enable Firebase for room functionality
     autoSave: true
   }
 };
