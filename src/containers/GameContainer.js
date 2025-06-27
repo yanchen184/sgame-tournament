@@ -1,10 +1,11 @@
 /**
- * Simplified Game Container - Enhanced Visual Flow
- * Main game interface without rules (moved to setup page)
+ * Enhanced Game Container - With Room Navigation Support
+ * Main game interface with room navigation and visual flow
  */
 
 import React from 'react';
 import { useGame } from '../contexts/GameContext';
+import { APP_MODES } from '../constants';
 
 // Components
 import GameArena from '../components/GameArena';
@@ -37,8 +38,8 @@ const GameContainer = () => {
     return (
       <div className="game-container error">
         <h2>遊戲尚未開始</h2>
-        <button onClick={() => setMode('player-setup')}>
-          返回設置
+        <button onClick={() => setMode(APP_MODES.ROOM_BROWSER)}>
+          返回房間
         </button>
       </div>
     );
@@ -88,7 +89,8 @@ const GameContainer = () => {
             onUndo={undoLastAction}
             onReset={resetGame}
             onEndGame={endGame}
-            onBackToSetup={() => setMode('player-setup')}
+            onBackToSetup={() => setMode(APP_MODES.PLAYER_SETUP)}
+            onBackToRooms={() => setMode(APP_MODES.ROOM_BROWSER)}
             canUndo={gameState.gameHistory.length > 0}
             isGameFinished={gameState.isGameFinished}
           />
