@@ -1,95 +1,87 @@
+/**
+ * Enhanced Game Controls - With Room Navigation
+ * Control panel for game actions with room browser support
+ */
+
 import React from 'react';
 import './GameControls.css';
 
 const GameControls = ({ 
-  gameStarted, 
-  gameEnded,
-  showRestOption,
-  hasUndoActions,
-  onStartGame, 
-  onDeclareWinner, 
-  onTakeRest, 
-  onContinuePlay,
-  onUndoAction,
+  onUndo,
+  onReset,
   onEndGame,
-  onResetGame,
-  onToggleHistory,
-  showHistory,
-  layout = 'desktop' // new prop for layout mode
+  onBackToSetup,
+  onBackToRooms,
+  canUndo,
+  isGameFinished
 }) => {
   return (
-    <div className={`controls ${layout === 'mobile' ? 'mobile-controls' : ''}`}>
-      {/* Show start button only if game hasn't started yet */}
-      {!gameStarted && (
-        <button className="btn start-btn" onClick={onStartGame}>
-          🎮 開始比賽
-        </button>
-      )}
+    <div className="game-controls">
+      <div className="controls-header">
+        <h3>🎮 遊戲控制</h3>
+      </div>
       
-      {/* Game in progress controls - prioritize victory buttons on mobile */}
-      {gameStarted && !gameEnded && !showRestOption && (
-        <div className="victory-buttons">
+      <div className="controls-grid">
+        {/* Primary actions */}
+        <div className="control-section">
+          <h4>操作</h4>
+          
+          {canUndo && (
+            <button 
+              className="control-btn undo-btn"
+              onClick={onUndo}
+              title="撤銷上一步操作 (支援無限撤銷)"
+            >
+              ↶ 撤銷操作
+            </button>
+          )}
+          
+          {!isGameFinished && (
+            <button 
+              className="control-btn end-btn"
+              onClick={onEndGame}
+            >
+              🏁 結束比賽
+            </button>
+          )}
+          
           <button 
-            className="btn success-btn victory-left" 
-            onClick={() => onDeclareWinner(1)}
+            className="control-btn reset-btn"
+            onClick={onReset}
           >
-            👈 左方勝利
+            🔄 重置比賽
+          </button>
+        </div>
+
+        {/* Navigation actions */}
+        <div className="control-section">
+          <h4>導航</h4>
+          
+          <button 
+            className="control-btn setup-btn"
+            onClick={onBackToSetup}
+          >
+            ⚙️ 返回設置
           </button>
           
           <button 
-            className="btn success-btn victory-right" 
-            onClick={() => onDeclareWinner(2)}
+            className="control-btn rooms-btn"
+            onClick={onBackToRooms}
           >
-            右方勝利 👉
+            🏠 回到房間
           </button>
         </div>
-      )}
-      
-      {/* Rest option controls */}
-      {showRestOption && !gameEnded && (
-        <div className="rest-options">
-          <button className="btn rest-btn" onClick={onTakeRest}>
-            😴 休息得1分
-          </button>
-          
-          <button className="btn continue-btn" onClick={onContinuePlay}>
-            💪 繼續比賽
-          </button>
-        </div>
-      )}
-      
-      {/* Secondary controls */}
-      <div className="secondary-controls">
-        {/* Undo button - available whenever there are actions to undo */}
-        {hasUndoActions && (
-          <button 
-            className="btn undo-btn" 
-            onClick={onUndoAction}
-            title="撤銷上一步操作 (無限制撤銷)"
-          >
-            ↶ 撤銷
-          </button>
-        )}
-        
-        {/* History toggle button */}
-        <button 
-          className={`btn history-btn ${showHistory ? 'active' : ''}`} 
-          onClick={onToggleHistory}
-        >
-          📚 {showHistory ? '關閉歷史' : '查看歷史'}
-        </button>
-        
-        {/* End game button - only show during active game */}
-        {gameStarted && !gameEnded && (
-          <button className="btn end-btn" onClick={onEndGame}>
-            🏁 結束比賽
-          </button>
-        )}
-        
-        {/* Return to room browser button - changed text */}
-        <button className="btn danger-btn" onClick={onResetGame}>
-          🏠 回到房間選擇
-        </button>
+      </div>
+
+      {/* Game tips */}
+      <div className="controls-tips">
+        <h4>💡 操作提示</h4>
+        <ul>
+          <li><strong>點擊選手</strong>：宣布該選手獲勝</li>
+          <li><strong>懸停預覽</strong>：查看勝利後的流程變化</li>
+          <li><strong>休息選項</strong>：連勝達標時會自動顯示</li>
+          <li><strong>無限撤銷</strong>：可隨時糾正錯誤操作</li>
+        </ul>
       </div>
     </div>
   );
