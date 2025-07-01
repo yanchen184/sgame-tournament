@@ -1,18 +1,27 @@
 import React from 'react';
 import './PlayerQueue.css';
 
-const PlayerQueue = ({ players, currentFighters, currentChampion, championBeatenOpponents, layout = 'desktop' }) => {
+const PlayerQueue = ({ players = [], currentFighters = [], currentChampion, championBeatenOpponents = [], layout = 'desktop' }) => {
   // Enhanced queue logic to correctly determine next player and full queue order
   const getQueueInfo = () => {
     console.log('=== ENHANCED PLAYER QUEUE ANALYSIS ===');
-    console.log('All players:', players.map(p => `${p.name}(pos:${p.position})`));
-    console.log('Current fighters:', currentFighters.map(f => f?.name || 'null'));
+    console.log('All players:', players?.map(p => `${p.name}(pos:${p.position})`) || []);
+    console.log('Current fighters:', currentFighters?.map(f => f?.name || 'null') || []);
     console.log('Current champion:', currentChampion?.name);
     console.log('Champion beaten opponents:', championBeatenOpponents?.map(p => p.name) || []);
     
+    // Return early if players array is not available
+    if (!players || !Array.isArray(players) || players.length === 0) {
+      return {
+        nextPlayer: null,
+        queueOrder: [],
+        fullQueueOrder: []
+      };
+    }
+    
     // Get players not currently fighting
     const waitingPlayers = players.filter(player => 
-      !currentFighters.some(fighter => fighter && fighter.id === player.id)
+      !currentFighters?.some(fighter => fighter && fighter.id === player.id)
     );
     
     console.log('Waiting players:', waitingPlayers.map(p => `${p.name}(pos:${p.position})`));
