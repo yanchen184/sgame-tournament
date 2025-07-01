@@ -3,7 +3,7 @@
  */
 
 // App version - Enhanced version with rooms and visual flow
-export const APP_VERSION = 'v1.4.0';
+export const APP_VERSION = 'v2.0.1';
 
 // App modes - Including room functionality
 export const APP_MODES = {
