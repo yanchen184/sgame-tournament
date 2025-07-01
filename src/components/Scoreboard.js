@@ -1,7 +1,21 @@
 import React from 'react';
 import './Scoreboard.css';
 
-const Scoreboard = ({ players, currentFighters, layout = 'desktop' }) => {
+const Scoreboard = ({ players = [], currentFighters = [], layout = 'desktop' }) => {
+  // Check if players is valid array before proceeding
+  if (!players || !Array.isArray(players) || players.length === 0) {
+    return (
+      <div className={`scoreboard ${layout === 'mobile' ? 'mobile-scoreboard' : ''}`}>
+        <h3 className="section-title">🏆 積分榜</h3>
+        <div className="scoreboard-container">
+          <div className="empty-scoreboard">
+            <p>目前沒有選手資料</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Sort players by score (descending)
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
@@ -10,7 +24,7 @@ const Scoreboard = ({ players, currentFighters, layout = 'desktop' }) => {
       <h3 className="section-title">🏆 積分榜</h3>
       <div className="scoreboard-container">
         {sortedPlayers.map((player, index) => {
-          const isInArena = currentFighters.some(fighter => fighter && fighter.id === player.id);
+          const isInArena = currentFighters?.some(fighter => fighter && fighter.id === player.id);
           
           return (
             <div 
