@@ -1,43 +1,53 @@
 /**
- * Simplified Streak Tournament Game Engine
- * Focus only on streak-based tournament functionality with enhanced visual support
+ * Fixed Sequence Tournament Game Engine (Modified from StreakGameEngine)
+ * Focus on fixed sequence battle order: AB -> CD -> CA -> BD -> BC -> AD
+ * Removes streak-based rest mechanics for simplified gameplay
  */
-
-import { STREAK_CONFIG } from '../constants';
 
 export class StreakGameEngine {
   constructor(players) {
-    // Validate input
-    if (!Array.isArray(players) || players.length < 3) {
-      throw new Error('At least 3 players required for streak tournament');
+    // Validate input - require exactly 4 players for fixed sequence
+    if (!Array.isArray(players) || players.length !== 4) {
+      throw new Error('Exactly 4 players required for fixed sequence tournament');
     }
 
+    // Create players with labels A, B, C, D
     this.players = players.map((name, index) => ({
       id: index,
       name: name.trim(),
+      label: String.fromCharCode(65 + index), // A, B, C, D
       score: 0,
-      currentStreak: 0,
-      totalWins: 0,
-      totalLosses: 0,
-      isActive: index < 2, // First two players start
-      isResting: false,
+      wins: 0,
+      losses: 0,
+      matchesPlayed: 0,
+      isActive: false,
       position: index
     }));
 
+    // Fixed sequence pattern: AB, CD, CA, BD, BC, AD
+    this.fixedSequence = ['AB', 'CD', 'CA', 'BD', 'BC', 'AD'];
+    this.currentSequenceIndex = 0;
+    this.completedMatches = [];
     this.gameHistory = [];
-    this.currentMatch = {
-      player1: this.players[0],
-      player2: this.players[1]
-    };
+    
+    // Initialize first match
+    this.currentMatch = this._generateCurrentMatch();
     this.isGameStarted = true;
     this.isGameFinished = false;
-    this.restRequirement = STREAK_CONFIG.getRestRequirement(players.length);
   }
 
   /**
    * Process match result when a player wins
    */
   declareWinner(winnerName) {
+    if (this.isGameFinished) {
+      throw new Error('Game has already finished');
+    }
+
+    if (this.currentSequenceIndex >= this.fixedSequence.length) {
+      throw new Error('All matches have been completed');
+    }
+
     const winner = this.players.find(p => p.name === winnerName);
     const loser = this.currentMatch.player1.name === winnerName 
       ? this.currentMatch.player2 
@@ -48,69 +58,121 @@ export class StreakGameEngine {
     }
 
     // Update winner stats
-    winner.score += STREAK_CONFIG.POINTS_PER_WIN;
-    winner.currentStreak += 1;
-    winner.totalWins += 1;
+    winner.score += 1; // Simple scoring: 1 point per win
+    winner.wins += 1;
+    winner.matchesPlayed += 1;
 
     // Update loser stats
-    loser.currentStreak = 0;
-    loser.totalLosses += 1;
+    loser.losses += 1;
+    loser.matchesPlayed += 1;
 
-    // Record match in history
-    this.gameHistory.push({
+    // Record match result
+    const matchResult = {
       id: this.gameHistory.length + 1,
+      matchNumber: this.currentSequenceIndex + 1,
+      pattern: this.fixedSequence[this.currentSequenceIndex],
+      sequenceIndex: this.currentSequenceIndex,
+      fighter1: this.currentMatch.player1,
+      fighter2: this.currentMatch.player2,
       winner: winner.name,
       loser: loser.name,
-      timestamp: Date.now(),
-      winnerScore: winner.score,
-      winnerStreak: winner.currentStreak
-    });
+      winnerLabel: winner.label,
+      loserLabel: loser.label,
+      timestamp: Date.now()
+    };
 
-    // Setup next match
-    this._setupNextMatch(winner, loser);
+    // Add to completed matches and history
+    this.completedMatches.push(matchResult);
+    this.gameHistory.push(matchResult);
+
+    // Move to next match in sequence
+    this.currentSequenceIndex++;
+
+    // Check if tournament is finished
+    if (this.currentSequenceIndex >= this.fixedSequence.length) {
+      this.isGameFinished = true;
+      this.currentMatch = null;
+      this.players.forEach(player => player.isActive = false);
+    } else {
+      // Generate next match
+      this.currentMatch = this._generateCurrentMatch();
+    }
 
     return {
       winner,
       loser,
-      canTakeRest: winner.currentStreak >= this.restRequirement && winner.currentStreak % this.restRequirement === 0
+      canTakeRest: false, // No rest option in fixed sequence
+      isGameFinished: this.isGameFinished
     };
   }
 
   /**
-   * Handle player taking rest (when eligible)
+   * Generate current match based on sequence
    */
-  takeRest(playerName) {
-    const player = this.players.find(p => p.name === playerName);
+  _generateCurrentMatch() {
+    if (this.currentSequenceIndex >= this.fixedSequence.length) {
+      return null;
+    }
+
+    const pattern = this.fixedSequence[this.currentSequenceIndex];
+    const [label1, label2] = pattern.split('');
     
-    if (!player) {
-      throw new Error('Player not found');
+    const player1 = this.players.find(p => p.label === label1);
+    const player2 = this.players.find(p => p.label === label2);
+
+    if (!player1 || !player2) {
+      throw new Error(`Unable to find players for pattern: ${pattern}`);
     }
 
-    if (player.currentStreak < this.restRequirement || player.currentStreak % this.restRequirement !== 0) {
-      throw new Error('Player not eligible for rest');
-    }
+    // Mark players as active for current match
+    this.players.forEach(p => p.isActive = false);
+    player1.isActive = true;
+    player2.isActive = true;
 
-    // Give bonus points and mark as resting
-    player.score += STREAK_CONFIG.REST_BONUS_POINTS;
-    player.isResting = true;
-    player.isActive = false;
-
-    // Record rest in history
-    this.gameHistory.push({
-      id: this.gameHistory.length + 1,
-      action: 'rest',
-      player: player.name,
-      timestamp: Date.now(),
-      bonusPoints: STREAK_CONFIG.REST_BONUS_POINTS,
-      newScore: player.score
-    });
-
-    // Setup next match without the resting player
-    this._setupNextMatchAfterRest();
+    return {
+      player1,
+      player2,
+      matchNumber: this.currentSequenceIndex + 1,
+      pattern: pattern,
+      totalMatches: this.fixedSequence.length
+    };
   }
 
   /**
-   * Undo last action
+   * Get tournament progress
+   */
+  getTournamentProgress() {
+    return {
+      current: this.currentSequenceIndex,
+      total: this.fixedSequence.length,
+      completed: this.completedMatches.length,
+      remaining: this.fixedSequence.length - this.currentSequenceIndex,
+      progress: `${this.completedMatches.length}/${this.fixedSequence.length}`
+    };
+  }
+
+  /**
+   * Get match sequence status
+   */
+  getMatchSequence() {
+    return this.fixedSequence.map((pattern, index) => {
+      const isCompleted = index < this.currentSequenceIndex;
+      const isCurrent = index === this.currentSequenceIndex;
+      const matchResult = isCompleted ? this.completedMatches[index] : null;
+
+      return {
+        index: index,
+        pattern: pattern,
+        matchNumber: index + 1,
+        status: isCompleted ? 'completed' : (isCurrent ? 'current' : 'pending'),
+        result: matchResult,
+        winner: matchResult ? matchResult.winner : null
+      };
+    });
+  }
+
+  /**
+   * Undo last action (simplified for fixed sequence)
    */
   undoLastAction() {
     if (this.gameHistory.length === 0) {
@@ -118,12 +180,25 @@ export class StreakGameEngine {
     }
 
     const lastAction = this.gameHistory.pop();
+    const lastMatch = this.completedMatches.pop();
     
-    if (lastAction.action === 'rest') {
-      this._undoRest(lastAction);
-    } else {
-      this._undoMatch(lastAction);
-    }
+    // Revert player stats
+    const winner = this.players.find(p => p.name === lastAction.winner);
+    const loser = this.players.find(p => p.name === lastAction.loser);
+
+    winner.score -= 1;
+    winner.wins -= 1;
+    winner.matchesPlayed -= 1;
+
+    loser.losses -= 1;
+    loser.matchesPlayed -= 1;
+
+    // Move back one step in sequence
+    this.currentSequenceIndex--;
+    this.isGameFinished = false;
+
+    // Regenerate current match
+    this.currentMatch = this._generateCurrentMatch();
 
     return lastAction;
   }
@@ -136,19 +211,24 @@ export class StreakGameEngine {
       players: this.players,
       currentMatch: this.currentMatch,
       gameHistory: this.gameHistory,
+      completedMatches: this.completedMatches,
       isGameStarted: this.isGameStarted,
       isGameFinished: this.isGameFinished,
-      restRequirement: this.restRequirement,
       leaderboard: this._getLeaderboard(),
-      nextPlayerInQueue: this._getNextPlayer()
+      tournamentProgress: this.getTournamentProgress(),
+      matchSequence: this.getMatchSequence(),
+      
+      // Legacy properties for compatibility
+      restRequirement: null, // No rest in fixed sequence
+      nextPlayerInQueue: null // No queue in fixed sequence
     };
   }
 
   /**
-   * Get next player in queue for visual preview
+   * Get next player in queue (always null for fixed sequence)
    */
   getNextPlayerInQueue() {
-    return this._getNextPlayer();
+    return null; // No queue concept in fixed sequence
   }
 
   /**
@@ -157,19 +237,17 @@ export class StreakGameEngine {
   resetGame() {
     this.players.forEach((player, index) => {
       player.score = 0;
-      player.currentStreak = 0;
-      player.totalWins = 0;
-      player.totalLosses = 0;
-      player.isActive = index < 2;
-      player.isResting = false;
+      player.wins = 0;
+      player.losses = 0;
+      player.matchesPlayed = 0;
+      player.isActive = false;
       player.position = index;
     });
 
+    this.currentSequenceIndex = 0;
+    this.completedMatches = [];
     this.gameHistory = [];
-    this.currentMatch = {
-      player1: this.players[0],
-      player2: this.players[1]
-    };
+    this.currentMatch = this._generateCurrentMatch();
     this.isGameFinished = false;
   }
 
@@ -181,156 +259,55 @@ export class StreakGameEngine {
     this.players.forEach(player => {
       player.isActive = false;
     });
+    this.currentMatch = null;
   }
 
-  // Private methods
-
-  _setupNextMatch(winner, loser) {
-    // Winner stays, loser goes to back of queue
-    loser.isActive = false;
-    
-    // Find next player in queue
-    const nextPlayer = this._getNextPlayer();
-    
-    if (nextPlayer) {
-      nextPlayer.isActive = true;
-      this.currentMatch = {
-        player1: winner,
-        player2: nextPlayer
-      };
-    } else {
-      // No more players available, handle resting players
-      this._handleNoAvailablePlayers(winner);
-    }
-  }
-
-  _setupNextMatchAfterRest() {
-    // Find two available players
-    const availablePlayers = this.players.filter(p => !p.isResting && !p.isActive);
-    
-    if (availablePlayers.length >= 2) {
-      availablePlayers[0].isActive = true;
-      availablePlayers[1].isActive = true;
-      
-      this.currentMatch = {
-        player1: availablePlayers[0],
-        player2: availablePlayers[1]
-      };
-    } else {
-      // Bring back resting players if needed
-      this._bringBackRestingPlayers();
-    }
-  }
-
-  _getNextPlayer() {
-    return this.players.find(p => !p.isActive && !p.isResting) || null;
-  }
-
-  _handleNoAvailablePlayers(currentWinner) {
-    // If all other players are resting, bring them back
-    const restingPlayers = this.players.filter(p => p.isResting);
-    if (restingPlayers.length > 0) {
-      restingPlayers.forEach(player => {
-        player.isResting = false;
-      });
-      
-      const nextPlayer = this._getNextPlayer();
-      if (nextPlayer) {
-        nextPlayer.isActive = true;
-        this.currentMatch = {
-          player1: currentWinner,
-          player2: nextPlayer
-        };
-      }
-    }
-  }
-
-  _bringBackRestingPlayers() {
-    this.players.forEach(player => {
-      if (player.isResting) {
-        player.isResting = false;
-      }
-    });
-    
-    // Setup match with available players
-    const availablePlayers = this.players.filter(p => !p.isActive);
-    if (availablePlayers.length >= 2) {
-      availablePlayers[0].isActive = true;
-      availablePlayers[1].isActive = true;
-      
-      this.currentMatch = {
-        player1: availablePlayers[0],
-        player2: availablePlayers[1]
-      };
-    }
-  }
-
-  _undoMatch(lastAction) {
-    const winner = this.players.find(p => p.name === lastAction.winner);
-    const loser = this.players.find(p => p.name === lastAction.loser);
-
-    // Revert winner stats
-    winner.score -= STREAK_CONFIG.POINTS_PER_WIN;
-    winner.currentStreak -= 1;
-    winner.totalWins -= 1;
-
-    // Revert loser stats
-    loser.totalLosses -= 1;
-    
-    // Recalculate loser's streak from history
-    loser.currentStreak = this._calculateStreakFromHistory(loser.name);
-
-    // Restore match state
-    winner.isActive = true;
-    loser.isActive = true;
-    this.currentMatch = {
-      player1: winner,
-      player2: loser
-    };
-  }
-
-  _undoRest(lastAction) {
-    const player = this.players.find(p => p.name === lastAction.player);
-    
-    // Revert rest
-    player.score -= STREAK_CONFIG.REST_BONUS_POINTS;
-    player.isResting = false;
-    player.isActive = true;
-    
-    // Find opponent for current match
-    const opponent = this._getNextPlayer();
-    if (opponent) {
-      opponent.isActive = true;
-      this.currentMatch = {
-        player1: player,
-        player2: opponent
-      };
-    }
-  }
-
-  _calculateStreakFromHistory(playerName) {
-    let streak = 0;
-    for (let i = this.gameHistory.length - 1; i >= 0; i--) {
-      const action = this.gameHistory[i];
-      if (action.winner === playerName) {
-        streak++;
-      } else if (action.loser === playerName) {
-        break;
-      }
-    }
-    return streak;
-  }
-
+  /**
+   * Get final standings
+   */
   _getLeaderboard() {
     return [...this.players]
       .sort((a, b) => {
+        // Primary: Score (wins)
         if (b.score !== a.score) return b.score - a.score;
-        if (b.currentStreak !== a.currentStreak) return b.currentStreak - a.currentStreak;
-        return b.totalWins - a.totalWins;
+        
+        // Secondary: Fewer losses
+        if (a.losses !== b.losses) return a.losses - b.losses;
+        
+        // Tertiary: Original position
+        return a.position - b.position;
       })
       .map((player, index) => ({
         ...player,
         rank: index + 1
       }));
+  }
+
+  /**
+   * Get winner (only when tournament is finished)
+   */
+  getWinner() {
+    if (!this.isGameFinished) {
+      return null;
+    }
+
+    const leaderboard = this._getLeaderboard();
+    return leaderboard.length > 0 ? leaderboard[0] : null;
+  }
+
+  /**
+   * Check if tournament is finished
+   */
+  isTournamentFinished() {
+    return this.isGameFinished;
+  }
+
+  // Legacy methods for compatibility (marked as deprecated)
+
+  /**
+   * @deprecated No rest functionality in fixed sequence tournament
+   */
+  takeRest(playerName) {
+    throw new Error('Rest functionality not available in fixed sequence tournament');
   }
 }
