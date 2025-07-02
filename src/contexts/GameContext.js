@@ -1,6 +1,7 @@
 /**
- * Enhanced Game Context - With Room Support and Visual Flow
- * Provides game state management with room functionality and streak-based gameplay
+ * Enhanced Game Context - Fixed Sequence Tournament
+ * Provides game state management with fixed sequence gameplay (AB->CD->CA->BD->BC->AD)
+ * Removed streak-based rest mechanics for simplified tournament flow
  */
 
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
@@ -15,9 +16,9 @@ const initialState = {
   // App mode management - Start with room browser
   currentMode: APP_MODES.ROOM_BROWSER,
   
-  // Player management
-  playerCount: GAME_DEFAULTS.DEFAULT_PLAYER_COUNT,
-  playerNames: [...GAME_DEFAULTS.DEFAULT_PLAYER_NAMES.slice(0, GAME_DEFAULTS.DEFAULT_PLAYER_COUNT)],
+  // Player management - Fixed to 4 players for fixed sequence
+  playerCount: 4, // Always 4 for fixed sequence
+  playerNames: [...GAME_DEFAULTS.DEFAULT_PLAYER_NAMES.slice(0, 4)],
   
   // Game state
   gameEngine: null,
@@ -41,7 +42,6 @@ const ActionTypes = {
   SET_PLAYER_NAMES: 'SET_PLAYER_NAMES',
   START_GAME: 'START_GAME',
   DECLARE_WINNER: 'DECLARE_WINNER',
-  TAKE_REST: 'TAKE_REST',
   UNDO_ACTION: 'UNDO_ACTION',
   RESET_GAME: 'RESET_GAME',
   END_GAME: 'END_GAME',
@@ -61,11 +61,12 @@ function gameReducer(state, action) {
       };
 
     case ActionTypes.SET_PLAYER_COUNT:
-      const newCount = action.payload;
-      const newNames = [...GAME_DEFAULTS.DEFAULT_PLAYER_NAMES.slice(0, newCount)];
+      // Always keep 4 players for fixed sequence
+      const newCount = 4;
+      const newNames = [...GAME_DEFAULTS.DEFAULT_PLAYER_NAMES.slice(0, 4)];
       // If we have existing names, preserve them
       if (state.playerNames.length > 0) {
-        for (let i = 0; i < Math.min(newCount, state.playerNames.length); i++) {
+        for (let i = 0; i < Math.min(4, state.playerNames.length); i++) {
           if (state.playerNames[i].trim()) {
             newNames[i] = state.playerNames[i];
           }
@@ -79,13 +80,31 @@ function gameReducer(state, action) {
       };
 
     case ActionTypes.SET_PLAYER_NAMES:
+      // Ensure exactly 4 player names
+      const names = action.payload.slice(0, 4);
+      while (names.length < 4) {
+        names.push(`選手${names.length + 1}`);
+      }
       return {
         ...state,
-        playerNames: action.payload
+        playerNames: names
       };
 
     case ActionTypes.START_GAME:
-      const gameEngine = new StreakGameEngine(action.payload.playerNames);
+      // Ensure exactly 4 players
+      const playerNames = action.payload.playerNames.slice(0, 4);
+      if (playerNames.length !== 4) {
+        return {
+          ...state,
+          statusMessage: {
+            type: STATUS_TYPES.ERROR,
+            message: '固定順序賽制需要恰好4位選手',
+            timestamp: Date.now()
+          }
+        };
+      }
+
+      const gameEngine = new StreakGameEngine(playerNames);
       return {
         ...state,
         gameEngine,
@@ -98,13 +117,22 @@ function gameReducer(state, action) {
       
       try {
         const result = state.gameEngine.declareWinner(action.payload.winnerName);
+        const newGameState = state.gameEngine.getGameState();
+        
+        let message = `🎉 ${result.winner.name} (${result.winner.label}) 獲勝！`;
+        if (result.isGameFinished) {
+          const winner = state.gameEngine.getWinner();
+          message = `🏁 比賽結束！🏆 冠軍：${winner.name} (${winner.label})！`;
+        }
+        
         return {
           ...state,
-          gameState: state.gameEngine.getGameState(),
+          gameState: newGameState,
           statusMessage: {
-            type: STATUS_TYPES.SUCCESS,
-            message: `${result.winner.name} 獲勝！${result.canTakeRest ? ' (可選擇休息)' : ''}`,
-            timestamp: Date.now()
+            type: result.isGameFinished ? STATUS_TYPES.SUCCESS : STATUS_TYPES.SUCCESS,
+            message: message,
+            timestamp: Date.now(),
+            persistent: result.isGameFinished
           }
         };
       } catch (error) {
@@ -113,31 +141,6 @@ function gameReducer(state, action) {
           statusMessage: {
             type: STATUS_TYPES.ERROR,
             message: `錯誤：${error.message}`,
-            timestamp: Date.now()
-          }
-        };
-      }
-
-    case ActionTypes.TAKE_REST:
-      if (!state.gameEngine) return state;
-      
-      try {
-        state.gameEngine.takeRest(action.payload.playerName);
-        return {
-          ...state,
-          gameState: state.gameEngine.getGameState(),
-          statusMessage: {
-            type: STATUS_TYPES.INFO,
-            message: `${action.payload.playerName} 選擇休息，獲得額外積分！`,
-            timestamp: Date.now()
-          }
-        };
-      } catch (error) {
-        return {
-          ...state,
-          statusMessage: {
-            type: STATUS_TYPES.ERROR,
-            message: `無法休息：${error.message}`,
             timestamp: Date.now()
           }
         };
@@ -153,7 +156,7 @@ function gameReducer(state, action) {
           gameState: state.gameEngine.getGameState(),
           statusMessage: {
             type: STATUS_TYPES.INFO,
-            message: `已撤銷：${undoneAction.winner ? `${undoneAction.winner} 的勝利` : undoneAction.action}`,
+            message: `已撤銷：${undoneAction.winner} 對 ${undoneAction.loser} 的勝利`,
             timestamp: Date.now()
           }
         };
@@ -241,9 +244,8 @@ export function GameProvider({ children }) {
   }, []);
 
   const setPlayerCount = useCallback((count) => {
-    if (count >= GAME_DEFAULTS.MIN_PLAYER_COUNT && count <= GAME_DEFAULTS.MAX_PLAYER_COUNT) {
-      dispatch({ type: ActionTypes.SET_PLAYER_COUNT, payload: count });
-    }
+    // Always set to 4 for fixed sequence, but we'll keep the function for compatibility
+    dispatch({ type: ActionTypes.SET_PLAYER_COUNT, payload: 4 });
   }, []);
 
   const setPlayerNames = useCallback((names) => {
@@ -251,12 +253,12 @@ export function GameProvider({ children }) {
   }, []);
 
   const startGame = useCallback((playerNames) => {
-    if (!playerNames || playerNames.length < GAME_DEFAULTS.MIN_PLAYER_COUNT) {
+    if (!playerNames || playerNames.length !== 4) {
       dispatch({
         type: ActionTypes.SET_STATUS,
         payload: {
           type: STATUS_TYPES.ERROR,
-          message: `至少需要 ${GAME_DEFAULTS.MIN_PLAYER_COUNT} 位選手`
+          message: '固定順序賽制需要恰好4位選手'
         }
       });
       return;
@@ -269,8 +271,15 @@ export function GameProvider({ children }) {
     dispatch({ type: ActionTypes.DECLARE_WINNER, payload: { winnerName } });
   }, []);
 
+  // Remove takeRest function as it's no longer needed
   const takeRest = useCallback((playerName) => {
-    dispatch({ type: ActionTypes.TAKE_REST, payload: { playerName } });
+    dispatch({
+      type: ActionTypes.SET_STATUS,
+      payload: {
+        type: STATUS_TYPES.WARNING,
+        message: '固定順序賽制無休息功能'
+      }
+    });
   }, []);
 
   const undoLastAction = useCallback(() => {
@@ -307,11 +316,18 @@ export function GameProvider({ children }) {
   }, [state.gameState]);
 
   const canPlayerRest = useCallback((playerName) => {
-    if (!state.gameState) return false;
-    const player = state.gameState.players.find(p => p.name === playerName);
-    return player && 
-           player.currentStreak >= state.gameState.restRequirement && 
-           player.currentStreak % state.gameState.restRequirement === 0;
+    // Always return false as there's no rest in fixed sequence
+    return false;
+  }, []);
+
+  // Get tournament progress for fixed sequence
+  const getTournamentProgress = useCallback(() => {
+    return state.gameState?.tournamentProgress || null;
+  }, [state.gameState]);
+
+  // Get match sequence for fixed sequence
+  const getMatchSequence = useCallback(() => {
+    return state.gameState?.matchSequence || [];
   }, [state.gameState]);
 
   // Context value
@@ -325,7 +341,7 @@ export function GameProvider({ children }) {
     setPlayerNames,
     startGame,
     declareWinner,
-    takeRest,
+    takeRest, // Keep for compatibility but show warning
     undoLastAction,
     resetGame,
     endGame,
@@ -336,7 +352,9 @@ export function GameProvider({ children }) {
     // Helpers
     getCurrentMatch,
     getLeaderboard,
-    canPlayerRest
+    canPlayerRest,
+    getTournamentProgress,
+    getMatchSequence
   };
 
   return (
