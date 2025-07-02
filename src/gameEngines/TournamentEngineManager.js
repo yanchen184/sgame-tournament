@@ -1,6 +1,7 @@
 import { StreakTournamentEngine } from './StreakTournamentEngine';
 import { EliminationTournamentEngine } from './EliminationTournamentEngine';
 import { RoundRobinTournamentEngine } from './RoundRobinTournamentEngine';
+import { FixedSequenceTournamentEngine } from './FixedSequenceTournamentEngine';
 
 /**
  * Tournament Engine Factory and Manager
@@ -12,7 +13,8 @@ export class TournamentEngineManager {
   static engines = {
     streak: StreakTournamentEngine,
     elimination: EliminationTournamentEngine,
-    roundrobin: RoundRobinTournamentEngine
+    roundrobin: RoundRobinTournamentEngine,
+    'fixed-sequence': FixedSequenceTournamentEngine
   };
 
   /**
@@ -109,6 +111,10 @@ export class TournamentEngineManager {
         if (players.length < 4) {
           warnings.push('連勝賽制建議至少 4 位選手，否則無法使用休息選項');
         }
+      } else if (tournamentId === 'fixed-sequence') {
+        if (players.length !== 4) {
+          errors.push('固定順序賽制需要恰好 4 位選手');
+        }
       }
 
     } catch (error) {
@@ -128,7 +134,9 @@ export class TournamentEngineManager {
    * @returns {string} Recommended tournament ID
    */
   static getRecommendedTournament(playerCount) {
-    if (playerCount < 3) {
+    if (playerCount === 4) {
+      return 'fixed-sequence'; // Prioritize fixed sequence for 4 players
+    } else if (playerCount < 3) {
       return 'streak';
     } else if (playerCount <= 4) {
       return 'streak';
@@ -161,6 +169,9 @@ export class TournamentEngineManager {
       case 'streak':
         // Estimated based on typical streak tournament
         totalMatches = Math.floor(playerCount * 2.5);
+        break;
+      case 'fixed-sequence':
+        totalMatches = 6; // Fixed 6 matches
         break;
       default:
         totalMatches = playerCount;
@@ -289,6 +300,24 @@ export class TournamentEngineManager {
             default: false,
             label: '雙循環',
             description: '每對選手對戰兩次'
+          }
+        };
+        
+      case 'fixed-sequence':
+        return {
+          pointsPerWin: {
+            type: 'number',
+            default: 1,
+            min: 1,
+            max: 3,
+            label: '勝利積分',
+            description: '每場勝利獲得的積分'
+          },
+          enableDatabaseSync: {
+            type: 'boolean',
+            default: true,
+            label: '啟用資料庫同步',
+            description: '將每場比賽結果同步到資料庫'
           }
         };
         
