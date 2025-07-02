@@ -1,62 +1,48 @@
-// Game Engines Export
+/**
+ * Game Engines Index
+ * Central export point for all tournament engines
+ */
+
+// Base Engine
 export { BaseTournamentEngine } from './BaseTournamentEngine';
+
+// Tournament Engines
 export { StreakTournamentEngine } from './StreakTournamentEngine';
 export { EliminationTournamentEngine } from './EliminationTournamentEngine';
 export { RoundRobinTournamentEngine } from './RoundRobinTournamentEngine';
+export { FixedSequenceTournamentEngine } from './FixedSequenceTournamentEngine';
+
+// Legacy Engine (for backward compatibility)
+export { StreakGameEngine } from './StreakGameEngine';
+
+// Manager
 export { TournamentEngineManager } from './TournamentEngineManager';
 
-// Tournament Types Constants
+// Default export
+export { TournamentEngineManager as default } from './TournamentEngineManager';
+
+/**
+ * Tournament Types Registry
+ */
 export const TOURNAMENT_TYPES = {
   STREAK: 'streak',
   ELIMINATION: 'elimination',
-  ROUND_ROBIN: 'roundrobin'
+  ROUND_ROBIN: 'roundrobin',
+  FIXED_SEQUENCE: 'fixed-sequence'
 };
 
-// Tournament Phases Constants
-export const TOURNAMENT_PHASES = {
-  SETUP: 'setup',
-  PLAYING: 'playing',
-  FINISHED: 'finished'
+/**
+ * Quick access to tournament info
+ */
+export const getTournamentInfo = (type) => {
+  const { TournamentEngineManager } = require('./TournamentEngineManager');
+  return TournamentEngineManager.getTournamentInfo(type);
 };
 
-// Available Actions Constants
-export const TOURNAMENT_ACTIONS = {
-  START_TOURNAMENT: 'startTournament',
-  DECLARE_WINNER: 'declareWinner',
-  TAKE_REST: 'takeRest',
-  CONTINUE_PLAY: 'continuePlay',
-  UNDO_ACTION: 'undoAction',
-  END_TOURNAMENT: 'endTournament'
-};
-
-// Utility function to get all tournament types
-export const getAllTournamentTypes = () => {
-  return TournamentEngineManager.getAvailableTournaments();
-};
-
-// Utility function to create tournament safely
-export const createTournamentSafe = (tournamentId, players, options = {}) => {
-  return TournamentEngineManager.createTournamentSafe(tournamentId, players, options);
-};
-
-// Utility function to validate tournament configuration
-export const validateTournament = (tournamentId, players, options = {}) => {
-  return TournamentEngineManager.validateTournamentConfig(tournamentId, players, options);
-};
-
-// Utility function to get recommended tournament
-export const getRecommendedTournament = (playerCount) => {
-  return TournamentEngineManager.getRecommendedTournament(playerCount);
-};
-
-// Default export
-export default {
-  TournamentEngineManager,
-  TOURNAMENT_TYPES,
-  TOURNAMENT_PHASES,
-  TOURNAMENT_ACTIONS,
-  getAllTournamentTypes,
-  createTournamentSafe,
-  validateTournament,
-  getRecommendedTournament
+/**
+ * Create tournament instance
+ */
+export const createTournament = (type, players, options) => {
+  const { TournamentEngineManager } = require('./TournamentEngineManager');
+  return TournamentEngineManager.createTournament(type, players, options);
 };
