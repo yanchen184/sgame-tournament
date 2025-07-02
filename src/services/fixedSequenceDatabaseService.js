@@ -9,7 +9,8 @@ import {
   getDocs, 
   orderBy, 
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -175,18 +176,21 @@ export class FixedSequenceDatabaseService {
       const sessionsQuery = query(
         collection(db, 'tournament-sessions'),
         where('type', '==', 'fixed-sequence'),
-        where('status', '==', 'active'),
-        orderBy('lastActivity', 'desc'),
-        orderBy('created', 'desc')
+        where('status', '==', 'active')
       );
       
       const querySnapshot = await getDocs(sessionsQuery);
-      return querySnapshot.docs.map(doc => ({
+      const sessions = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         created: doc.data().created?.toDate() || new Date(),
         lastActivity: doc.data().lastActivity?.toDate() || new Date()
       }));
+
+      // Sort by last activity in memory to avoid compound index issues
+      return sessions
+        .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity))
+        .slice(0, limit);
     } catch (error) {
       console.error('Error getting active sessions:', error);
       // Fallback query without compound index
