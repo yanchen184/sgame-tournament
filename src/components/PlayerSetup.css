@@ -39,6 +39,30 @@
   font-size: 1.2em;
 }
 
+/* Fixed Count Display */
+.fixed-count-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.count-badge {
+  background: linear-gradient(45deg, #4CAF50, #45a049);
+  color: white;
+  padding: 12px 25px;
+  border-radius: 25px;
+  font-weight: bold;
+  font-size: 1.1em;
+  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+}
+
+.count-description {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9em;
+  text-align: center;
+}
+
 /* Player Count Section */
 .player-count-section {
   margin-bottom: 35px;

@@ -8,8 +8,8 @@ import { useGame } from '../contexts/GameContext';
 import { APP_MODES } from '../constants';
 
 // Components
-import GameArena from '../components/GameArena';
-import PlayerQueue from '../components/PlayerQueue';
+import FixedSequenceArena from '../components/FixedSequenceArena';
+import FixedSequenceDisplay from '../components/FixedSequenceDisplay';
 import Scoreboard from '../components/Scoreboard';
 import GameControls from '../components/GameControls';
 import GameHistory from '../components/GameHistory';
@@ -48,26 +48,15 @@ const GameContainer = () => {
   const currentMatch = getCurrentMatch();
   const leaderboard = getLeaderboard();
 
-  // Get next player in queue for visual preview
-  const getNextPlayerInQueue = () => {
-    if (!gameState.players) return null;
-    
-    // Find players who are not currently active and not resting
-    const queuedPlayers = gameState.players.filter(p => !p.isActive && !p.isResting);
-    return queuedPlayers.length > 0 ? queuedPlayers[0] : null;
-  };
-
-  const nextPlayerInQueue = getNextPlayerInQueue();
-
   return (
     <div className="game-container enhanced">
       {/* Header with game info */}
       <div className="game-header">
-        <h1>🥊 連勝競技系統</h1>
+        <h1>🥊 固定順序賽制</h1>
         <div className="game-info">
-          <span>參賽人數: {gameState.players.length}人</span>
-          <span>連勝休息: {gameState.restRequirement}場</span>
-          <span>比賽場次: {gameState.gameHistory.filter(h => h.winner).length}</span>
+          <span>參賽人數: {gameState.standings ? gameState.standings.length : 0}人</span>
+          <span>對戰順序: AB → CD → CA → BD → BC → AD</span>
+          <span>進度: {gameState.currentSequenceIndex || 0}/6</span>
         </div>
       </div>
 
@@ -75,14 +64,14 @@ const GameContainer = () => {
       <div className="game-main">
         {/* Left panel - Enhanced Arena */}
         <div className="game-left">
-          <GameArena 
+          <FixedSequenceArena 
             currentMatch={currentMatch}
             onDeclareWinner={declareWinner}
-            canTakeRest={(playerName) => canPlayerRest(playerName)}
-            onTakeRest={takeRest}
-            isGameFinished={gameState.isGameFinished}
-            players={gameState.players}
-            nextPlayerInQueue={nextPlayerInQueue}
+            isGameFinished={gameState.phase === 'finished'}
+            sequenceProgress={{
+              current: gameState.currentSequenceIndex || 0,
+              total: 6
+            }}
           />
           
           <GameControls
@@ -91,22 +80,23 @@ const GameContainer = () => {
             onEndGame={endGame}
             onBackToSetup={() => setMode(APP_MODES.PLAYER_SETUP)}
             onBackToRooms={() => setMode(APP_MODES.ROOM_BROWSER)}
-            canUndo={gameState.gameHistory.length > 0}
-            isGameFinished={gameState.isGameFinished}
+            canUndo={gameState.matchHistory && gameState.matchHistory.length > 0}
+            isGameFinished={gameState.phase === 'finished'}
           />
         </div>
 
-        {/* Right panel - Queue and Scoreboard */}
+        {/* Right panel - Sequence Display and Scoreboard */}
         <div className="game-right">
-          <PlayerQueue 
-            players={gameState.players}
-            currentMatch={currentMatch}
-            nextPlayerInQueue={nextPlayerInQueue}
+          <FixedSequenceDisplay 
+            sequence={['AB', 'CD', 'CA', 'BD', 'BC', 'AD']}
+            currentIndex={gameState.currentSequenceIndex || 0}
+            completedMatches={gameState.completedMatches || []}
+            players={gameState.standings || []}
           />
           
           <Scoreboard 
-            players={leaderboard}
-            isGameFinished={gameState.isGameFinished}
+            players={gameState.standings || []}
+            isGameFinished={gameState.phase === 'finished'}
           />
         </div>
       </div>
@@ -115,8 +105,8 @@ const GameContainer = () => {
       <div className="game-bottom">
         <div className="game-bottom-full">
           <GameHistory 
-            history={gameState.gameHistory}
-            players={gameState.players}
+            history={gameState.matchHistory || []}
+            players={gameState.standings || []}
           />
         </div>
       </div>

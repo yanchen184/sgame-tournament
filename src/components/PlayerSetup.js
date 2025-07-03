@@ -44,12 +44,11 @@ const PlayerSetup = () => {
   // Generate random names
   const generateRandomNames = () => {
     const randomNames = [
-      '武士阿萬', '劍客阿強', '忍者阿華', '拳手阿明',
-      '刀客阿傑', '格鬥阿豪', '戰士阿勇', '英雄阿偉'
+      '武士阿萬', '劍客阿強', '忍者阿華', '拳手阿明'
     ];
     
     const newNames = [];
-    for (let i = 0; i < playerCount; i++) {
+    for (let i = 0; i < 4; i++) {
       newNames.push(randomNames[i] || `選手${String.fromCharCode(65 + i)}`);
     }
     
@@ -59,16 +58,11 @@ const PlayerSetup = () => {
 
   // Validate and start game
   const handleStartGame = () => {
-    // Validate player names
-    const validNames = localPlayerNames.filter(name => name.trim().length > 0);
+    // Validate player names - fixed 4 players
+    const validNames = localPlayerNames.slice(0, 4).filter(name => name.trim().length > 0);
     
-    if (validNames.length < GAME_DEFAULTS.MIN_PLAYER_COUNT) {
-      setStatus('error', `至少需要 ${GAME_DEFAULTS.MIN_PLAYER_COUNT} 位選手`);
-      return;
-    }
-
-    if (validNames.length !== playerCount) {
-      setStatus('error', '請確保所有選手都有名稱');
+    if (validNames.length < 4) {
+      setStatus('error', '固定順序賽制需要恰好4位選手');
       return;
     }
 
@@ -90,37 +84,27 @@ const PlayerSetup = () => {
       <div className="setup-container">
         {/* Header */}
         <div className="setup-header">
-          <h1>🥊 連勝競技系統</h1>
-          <p>設置選手並開始連勝賽制比賽</p>
+          <h1>🥊 固定順序賽制</h1>
+          <p>設置4位選手並開始固定順序比賽</p>
         </div>
 
-        {/* Player count selection */}
+        {/* Fixed 4 players notice */}
         <div className="player-count-section">
-          <h3>選擇參賽人數</h3>
-          <div className="player-count-buttons">
-            {Array.from({ length: GAME_DEFAULTS.MAX_PLAYER_COUNT - GAME_DEFAULTS.MIN_PLAYER_COUNT + 1 }, (_, i) => {
-              const count = GAME_DEFAULTS.MIN_PLAYER_COUNT + i;
-              return (
-                <button
-                  key={count}
-                  className={`count-btn ${playerCount === count ? 'active' : ''}`}
-                  onClick={() => handlePlayerCountChange(count)}
-                >
-                  {count}人
-                </button>
-              );
-            })}
+          <h3>參賽人數</h3>
+          <div className="fixed-count-display">
+            <span className="count-badge">4人 (固定)</span>
+            <span className="count-description">固定順序賽制需要恰好4位選手</span>
           </div>
         </div>
 
         {/* Game rules preview */}
         <div className="rules-preview">
-          <h4>連勝規則預覽</h4>
+          <h4>固定順序規則</h4>
           <div className="rules-info">
-            <span>🏆 連勝 {restRequirement} 場可選擇休息</span>
-            <span>⭐ 休息可獲得額外 1 分</span>
-            <span>🔄 勝者留場，敗者排隊</span>
-            <span>↶ 支援無限撤銷操作</span>
+            <span>🎯 對戰順序：AB → CD → CA → BD → BC → AD</span>
+            <span>🏆 每場勝利得1分</span>
+            <span>📊 積分最高者獲勝</span>
+            <span>💾 結果自動保存到資料庫</span>
           </div>
         </div>
 
@@ -138,21 +122,24 @@ const PlayerSetup = () => {
           </div>
           
           <div className="player-inputs">
-            {Array.from({ length: playerCount }, (_, index) => (
-              <div key={index} className="player-input-group">
-                <label htmlFor={`player-${index}`}>
-                  選手 {index + 1}
-                </label>
-                <input
-                  id={`player-${index}`}
-                  type="text"
-                  value={localPlayerNames[index] || ''}
-                  onChange={(e) => handlePlayerNameChange(index, e.target.value)}
-                  placeholder={`輸入選手 ${index + 1} 的名稱`}
-                  maxLength={20}
-                />
-              </div>
-            ))}
+            {Array.from({ length: 4 }, (_, index) => {
+              const label = String.fromCharCode(65 + index); // A, B, C, D
+              return (
+                <div key={index} className="player-input-group">
+                  <label htmlFor={`player-${index}`}>
+                    選手 {label}
+                  </label>
+                  <input
+                    id={`player-${index}`}
+                    type="text"
+                    value={localPlayerNames[index] || ''}
+                    onChange={(e) => handlePlayerNameChange(index, e.target.value)}
+                    placeholder={`輸入選手 ${label} 的名稱`}
+                    maxLength={20}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -169,8 +156,8 @@ const PlayerSetup = () => {
         {/* Info footer */}
         <div className="setup-footer">
           <p>
-            ℹ️ {playerCount} 人比賽：連勝 {restRequirement} 場可休息 
-            • 每場勝利得 1 分 • 休息額外得 1 分
+            ℹ️ 4人固定順序賽制：AB → CD → CA → BD → BC → AD
+            • 共6場比賽 • 每場勝利得1分 • 資料庫同步
           </p>
         </div>
       </div>

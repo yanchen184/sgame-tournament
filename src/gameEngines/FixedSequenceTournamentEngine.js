@@ -6,6 +6,9 @@ import { BaseTournamentEngine } from './BaseTournamentEngine';
  * Every match result is recorded in database for multi-machine synchronization
  */
 export class FixedSequenceTournamentEngine extends BaseTournamentEngine {
+  constructor(players = [], options = {}) {
+    super(players, options);
+  }
   
   getDefaultOptions() {
     return {
@@ -13,7 +16,9 @@ export class FixedSequenceTournamentEngine extends BaseTournamentEngine {
       pointsPerWin: 1,
       pointsPerLoss: 0,
       requiredPlayers: 4, // Fixed 4 players only
-      sequencePattern: ['AB', 'CD', 'CA', 'BD', 'BC', 'AD'] // Fixed sequence
+      sequencePattern: ['AB', 'CD', 'CA', 'BD', 'BC', 'AD'], // Fixed sequence
+      allowUndo: true, // Enable undo functionality
+      maxUndoSteps: 10 // Maximum number of undo steps
     };
   }
 
@@ -30,9 +35,11 @@ export class FixedSequenceTournamentEngine extends BaseTournamentEngine {
   }
 
   validatePlayers(players) {
-    const result = super.validatePlayers(players);
-    if (!result.isValid) {
-      return result;
+    if (!Array.isArray(players)) {
+      return {
+        isValid: false,
+        errors: ['Players must be an array']
+      };
     }
 
     // Ensure exactly 4 players
@@ -43,7 +50,26 @@ export class FixedSequenceTournamentEngine extends BaseTournamentEngine {
       };
     }
 
-    return { isValid: true, errors: [] };
+    // Validate each player has required properties
+    const errors = [];
+    for (let i = 0; i < players.length; i++) {
+      const player = players[i];
+      if (!player || typeof player !== 'object') {
+        errors.push(`Player ${i + 1} is not a valid object`);
+        continue;
+      }
+      if (!player.name || typeof player.name !== 'string' || player.name.trim() === '') {
+        errors.push(`Player ${i + 1} must have a valid name`);
+      }
+      if (!player.id || typeof player.id !== 'string') {
+        errors.push(`Player ${i + 1} must have a valid ID`);
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 
   createInitialStandings() {
@@ -93,7 +119,19 @@ export class FixedSequenceTournamentEngine extends BaseTournamentEngine {
   }
 
   processMatchResult(winnerName, matchData = {}) {
-    this.saveStateForUndo();
+    // Save state for undo (if undo is enabled)
+    if (this.options.allowUndo) {
+      const currentState = JSON.parse(JSON.stringify(this.gameState));
+      if (!this.gameState.undoStack) {
+        this.gameState.undoStack = [];
+      }
+      this.gameState.undoStack.push(currentState);
+      
+      // Keep only last N states to prevent memory issues
+      if (this.gameState.undoStack.length > this.options.maxUndoSteps) {
+        this.gameState.undoStack.shift();
+      }
+    }
 
     const match = this.gameState.currentMatch;
     if (!match) {
@@ -143,6 +181,16 @@ export class FixedSequenceTournamentEngine extends BaseTournamentEngine {
       this.gameState.phase = 'finished';
     }
 
+    return this.gameState;
+  }
+
+  undoLastAction() {
+    if (!this.options.allowUndo || !this.gameState.undoStack || this.gameState.undoStack.length === 0) {
+      throw new Error('Cannot undo: no previous state available');
+    }
+
+    const previousState = this.gameState.undoStack.pop();
+    this.gameState = { ...previousState };
     return this.gameState;
   }
 

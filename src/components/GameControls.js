@@ -78,9 +78,9 @@ const GameControls = ({
         <h4>💡 操作提示</h4>
         <ul>
           <li><strong>點擊選手</strong>：宣布該選手獲勝</li>
-          <li><strong>懸停預覽</strong>：查看勝利後的流程變化</li>
-          <li><strong>休息選項</strong>：連勝達標時會自動顯示</li>
-          <li><strong>無限撤銷</strong>：可隨時糾正錯誤操作</li>
+          <li><strong>固定順序</strong>：AB → CD → CA → BD → BC → AD</li>
+          <li><strong>積分系統</strong>：每場勝利得1分</li>
+          <li><strong>資料同步</strong>：結果自動保存到資料庫</li>
         </ul>
       </div>
     </div>

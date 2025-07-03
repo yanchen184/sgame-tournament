@@ -4,8 +4,8 @@
  */
 
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
-import { StreakGameEngine } from '../gameEngines/StreakGameEngine';
-import { APP_MODES, GAME_DEFAULTS, STATUS_TYPES } from '../constants';
+import { FixedSequenceTournamentEngine } from '../gameEngines/FixedSequenceTournamentEngine';
+import { APP_MODES, GAME_DEFAULTS, FIXED_SEQUENCE_CONFIG, STATUS_TYPES } from '../constants';
 
 // Game Context
 const GameContext = createContext();
@@ -85,11 +85,34 @@ function gameReducer(state, action) {
       };
 
     case ActionTypes.START_GAME:
-      const gameEngine = new StreakGameEngine(action.payload.playerNames);
+      // Create players with IDs for Fixed Sequence Tournament
+      const players = action.payload.playerNames.map((name, index) => ({
+        id: `player_${index}`,
+        name: name.trim(),
+        position: index + 1
+      }));
+      
+      const gameEngine = new FixedSequenceTournamentEngine(players);
+      const validationResult = gameEngine.validatePlayers(players);
+      
+      if (!validationResult.isValid) {
+        return {
+          ...state,
+          statusMessage: {
+            type: STATUS_TYPES.ERROR,
+            message: validationResult.errors.join(', '),
+            timestamp: Date.now()
+          }
+        };
+      }
+      
+      // Start tournament automatically
+      gameEngine.startTournament();
+      
       return {
         ...state,
         gameEngine,
-        gameState: gameEngine.getGameState(),
+        gameState: gameEngine.gameState,
         currentMode: APP_MODES.GAME
       };
 
@@ -97,13 +120,13 @@ function gameReducer(state, action) {
       if (!state.gameEngine) return state;
       
       try {
-        const result = state.gameEngine.declareWinner(action.payload.winnerName);
+        state.gameEngine.processMatchResult(action.payload.winnerName);
         return {
           ...state,
-          gameState: state.gameEngine.getGameState(),
+          gameState: state.gameEngine.gameState,
           statusMessage: {
             type: STATUS_TYPES.SUCCESS,
-            message: `${result.winner.name} 獲勝！${result.canTakeRest ? ' (可選擇休息)' : ''}`,
+            message: `${action.payload.winnerName} 獲勝！`,
             timestamp: Date.now()
           }
         };
@@ -119,41 +142,27 @@ function gameReducer(state, action) {
       }
 
     case ActionTypes.TAKE_REST:
-      if (!state.gameEngine) return state;
-      
-      try {
-        state.gameEngine.takeRest(action.payload.playerName);
-        return {
-          ...state,
-          gameState: state.gameEngine.getGameState(),
-          statusMessage: {
-            type: STATUS_TYPES.INFO,
-            message: `${action.payload.playerName} 選擇休息，獲得額外積分！`,
-            timestamp: Date.now()
-          }
-        };
-      } catch (error) {
-        return {
-          ...state,
-          statusMessage: {
-            type: STATUS_TYPES.ERROR,
-            message: `無法休息：${error.message}`,
-            timestamp: Date.now()
-          }
-        };
-      }
+      // Fixed Sequence Tournament does not support rest mechanism
+      return {
+        ...state,
+        statusMessage: {
+          type: STATUS_TYPES.WARNING,
+          message: '固定順序賽制不支持休息機制',
+          timestamp: Date.now()
+        }
+      };
 
     case ActionTypes.UNDO_ACTION:
       if (!state.gameEngine) return state;
       
       try {
-        const undoneAction = state.gameEngine.undoLastAction();
+        state.gameEngine.undoLastAction();
         return {
           ...state,
-          gameState: state.gameEngine.getGameState(),
+          gameState: state.gameEngine.gameState,
           statusMessage: {
             type: STATUS_TYPES.INFO,
-            message: `已撤銷：${undoneAction.winner ? `${undoneAction.winner} 的勝利` : undoneAction.action}`,
+            message: '已撤銷上一個動作',
             timestamp: Date.now()
           }
         };
@@ -170,11 +179,12 @@ function gameReducer(state, action) {
 
     case ActionTypes.RESET_GAME:
       if (state.gameEngine) {
-        state.gameEngine.resetGame();
+        // Reset to initial state
+        state.gameEngine.gameState = state.gameEngine.initializeGameState();
       }
       return {
         ...state,
-        gameState: state.gameEngine ? state.gameEngine.getGameState() : null,
+        gameState: state.gameEngine ? state.gameEngine.gameState : null,
         statusMessage: {
           type: STATUS_TYPES.INFO,
           message: '遊戲已重置',
@@ -184,11 +194,11 @@ function gameReducer(state, action) {
 
     case ActionTypes.END_GAME:
       if (state.gameEngine) {
-        state.gameEngine.endGame();
+        state.gameEngine.gameState.phase = 'finished';
       }
       return {
         ...state,
-        gameState: state.gameEngine ? state.gameEngine.getGameState() : null,
+        gameState: state.gameEngine ? state.gameEngine.gameState : null,
         statusMessage: {
           type: STATUS_TYPES.SUCCESS,
           message: '遊戲結束！查看最終排名',
@@ -303,16 +313,13 @@ export function GameProvider({ children }) {
   }, [state.gameState]);
 
   const getLeaderboard = useCallback(() => {
-    return state.gameState?.leaderboard || [];
+    return state.gameState?.standings || [];
   }, [state.gameState]);
 
   const canPlayerRest = useCallback((playerName) => {
-    if (!state.gameState) return false;
-    const player = state.gameState.players.find(p => p.name === playerName);
-    return player && 
-           player.currentStreak >= state.gameState.restRequirement && 
-           player.currentStreak % state.gameState.restRequirement === 0;
-  }, [state.gameState]);
+    // Fixed Sequence Tournament does not support rest mechanism
+    return false;
+  }, []);
 
   // Context value
   const contextValue = {
